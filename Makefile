@@ -1,5 +1,4 @@
-.PHONY: build release debug test test-verbose clean install uninstall serve analyze gen-test-files fmt lint check help
-.PHONY: db-nodes db-edges db-graph db-commands db-backup db-view goal decision option action outcome obs link status
+.PHONY: build release debug test test-verbose clean install uninstall serve analyze gen-test-files fmt lint check help db-nodes db-edges db-graph db-commands db-backup db-view goal decision option action outcome obs link status
 
 # Default target
 all: release
