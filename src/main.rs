@@ -1,7 +1,9 @@
+use chrono::Local;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use losselot::{AnalysisResult, Analyzer, Verdict};
 use rayon::prelude::*;
+use std::io::{self, Write};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
@@ -9,13 +11,29 @@ use walkdir::WalkDir;
 #[command(name = "losselot")]
 #[command(author, version, about = "Detect 'lossless' files that were created from lossy sources")]
 struct Args {
-    /// File or directory to analyze
-    #[arg(required = true)]
-    path: PathBuf,
+    /// File or directory to analyze (optional in GUI mode)
+    #[arg(required_unless_present = "gui")]
+    path: Option<PathBuf>,
+
+    /// Launch GUI file picker
+    #[arg(long)]
+    gui: bool,
 
     /// Output report file (.html, .csv, .json)
     #[arg(short, long)]
     output: Option<PathBuf>,
+
+    /// Directory for auto-generated reports
+    #[arg(long, default_value = "losselot-reports")]
+    report_dir: PathBuf,
+
+    /// Don't auto-generate HTML report
+    #[arg(long)]
+    no_report: bool,
+
+    /// Don't prompt to open report
+    #[arg(long)]
+    no_open: bool,
 
     /// Number of parallel workers (default: number of CPUs)
     #[arg(short, long)]
@@ -41,6 +59,19 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
+    // Handle GUI mode
+    let path = if args.gui {
+        match pick_path_gui() {
+            Some(p) => p,
+            None => {
+                eprintln!("No file or folder selected.");
+                std::process::exit(0);
+            }
+        }
+    } else {
+        args.path.clone().unwrap()
+    };
+
     // Set up thread pool
     if let Some(jobs) = args.jobs {
         rayon::ThreadPoolBuilder::new()
@@ -55,8 +86,8 @@ fn main() {
     ].iter().cloned().collect();
 
     // Collect audio files
-    let files: Vec<PathBuf> = if args.path.is_dir() {
-        WalkDir::new(&args.path)
+    let files: Vec<PathBuf> = if path.is_dir() {
+        WalkDir::new(&path)
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| {
@@ -69,7 +100,7 @@ fn main() {
             .map(|e| e.path().to_path_buf())
             .collect()
     } else {
-        vec![args.path.clone()]
+        vec![path.clone()]
     };
 
     if files.is_empty() {
@@ -193,14 +224,43 @@ fn main() {
         }
     }
 
+    // Determine report path
+    let report_path = if let Some(ref output) = args.output {
+        Some(output.clone())
+    } else if !args.no_report {
+        // Auto-generate report
+        std::fs::create_dir_all(&args.report_dir).ok();
+        let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+        let filename = format!("losselot_report_{}.html", timestamp);
+        Some(args.report_dir.join(filename))
+    } else {
+        None
+    };
+
     // Generate report
-    if let Some(output_path) = args.output {
-        if let Err(e) = losselot::report::generate(&output_path, &results) {
+    if let Some(ref output_path) = report_path {
+        if let Err(e) = losselot::report::generate(output_path, &results) {
             eprintln!("Failed to write report: {}", e);
             std::process::exit(1);
         }
         if !args.quiet {
             eprintln!("\n\x1b[32mReport saved: {}\x1b[0m", output_path.display());
+        }
+
+        // Prompt to open report
+        if !args.no_open && !args.quiet {
+            eprint!("\nOpen report in browser? [Y/n] ");
+            io::stderr().flush().ok();
+
+            let mut input = String::new();
+            if io::stdin().read_line(&mut input).is_ok() {
+                let input = input.trim().to_lowercase();
+                if input.is_empty() || input == "y" || input == "yes" {
+                    if let Err(e) = open::that(output_path) {
+                        eprintln!("Failed to open report: {}", e);
+                    }
+                }
+            }
         }
     }
 
@@ -214,6 +274,22 @@ fn main() {
     } else if suspect_count > 0 {
         std::process::exit(1);
     }
+}
+
+fn pick_path_gui() -> Option<PathBuf> {
+    // First try folder picker
+    if let Some(folder) = rfd::FileDialog::new()
+        .set_title("Select folder to analyze (or Cancel for single file)")
+        .pick_folder()
+    {
+        return Some(folder);
+    }
+
+    // If cancelled, offer file picker
+    rfd::FileDialog::new()
+        .set_title("Select audio file to analyze")
+        .add_filter("Audio files", &["flac", "wav", "mp3", "m4a", "aac", "ogg", "opus", "aiff"])
+        .pick_file()
 }
 
 fn truncate(s: &str, max_len: usize) -> String {

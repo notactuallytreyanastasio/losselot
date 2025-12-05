@@ -29,6 +29,15 @@ rayon = "1.8"
 # Progress indication
 indicatif = "0.17"
 
+# GUI file dialog
+rfd = "0.15"
+
+# Cross-platform file opening
+open = "5.3"
+
+# Date/time for report filenames
+chrono = "0.4"
+
 [profile.release]
 lto = true
 codegen-units = 1
