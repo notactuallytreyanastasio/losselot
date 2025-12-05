@@ -12,6 +12,8 @@
     body { font-family: system-ui, sans-serif; background: #fafafa; color: #333; }
     .container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
     h1 { font-size: 1.25rem; font-weight: 600; }
+    .nav-link { font-size: 0.75rem; font-weight: 400; color: #1976d2; text-decoration: none; margin-left: 1rem; }
+    .nav-link:hover { text-decoration: underline; }
     .meta { color: #666; font-size: 0.8rem; margin: 0.25rem 0 0; }
     .meta code { background: #eee; padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.75rem; }
 
@@ -104,6 +106,28 @@
     .loading { text-align: center; padding: 3rem; color: #888; }
     .error { background: #ffebee; color: #c62828; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
     .placeholder { color: #999; text-align: center; padding: 3rem; font-size: 0.9rem; }
+
+    /* Tab styles */
+    .tabs { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 1px solid #e0e0e0; }
+    .tab { padding: 0.5rem 1rem; cursor: pointer; font-size: 0.8rem; font-weight: 500; color: #666; border-bottom: 2px solid transparent; transition: all 0.15s; }
+    .tab:hover { color: #333; background: #f5f5f5; }
+    .tab.active { color: #1976d2; border-bottom-color: #1976d2; }
+
+    /* Raw numbers viewer */
+    .raw-numbers { font-size: 0.75rem; }
+    .raw-section { margin-bottom: 1rem; }
+    .raw-section h4 { font-size: 0.8rem; font-weight: 600; color: #333; margin-bottom: 0.5rem; padding-bottom: 0.25rem; border-bottom: 1px solid #eee; }
+    .raw-table { width: 100%; border-collapse: collapse; }
+    .raw-table th { text-align: left; padding: 0.25rem 0.5rem; font-weight: 500; color: #666; background: #f5f5f5; }
+    .raw-table td { padding: 0.25rem 0.5rem; border-bottom: 1px solid #f0f0f0; }
+    .raw-table td:first-child { font-weight: 500; color: #555; white-space: nowrap; }
+    .raw-table td:last-child { font-family: monospace; color: #333; }
+    .raw-value-good { color: #2e7d32; }
+    .raw-value-warn { color: #f57c00; }
+    .raw-value-bad { color: #c62828; }
+    .raw-json { background: #f5f5f5; padding: 0.75rem; border-radius: 4px; font-family: monospace; font-size: 0.7rem; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+    .export-btn { background: #1976d2; color: white; border: none; padding: 0.35rem 0.75rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-right: 0.5rem; }
+    .export-btn:hover { background: #1565c0; }
   </style>
 </head>
 <body>
@@ -377,7 +401,7 @@
         <div className="container">
           <div className="header-row">
             <div className="header-left">
-              <h1>Losselot</h1>
+              <h1>Losselot <a href="/graph" className="nav-link">Decision Graph →</a></h1>
               <p className="meta"><code>{data.params.path}</code> — {data.summary.total} files</p>
             </div>
             <Summary summary={data.summary} />
@@ -419,35 +443,46 @@
     }
 
     function FileDetail({ file }) {
+      const [activeTab, setActiveTab] = useState('analysis');
+
       return (
         <div className="detail">
-          <div className="detail-grid">
-            <div className="detail-main">
-              <h2>{file.file_name}</h2>
-              <div className="info-grid">
-                <div><strong>Bitrate:</strong> {file.bitrate} kbps</div>
-                <div><strong>Sample Rate:</strong> {file.sample_rate} Hz</div>
-                <div><strong>Duration:</strong> {file.duration_secs?.toFixed(1)}s</div>
-                <div><strong>Encoder:</strong> {file.encoder}</div>
-                {file.lowpass && <div><strong>Lowpass:</strong> {file.lowpass} Hz</div>}
+          <h2>{file.file_name}</h2>
+          <div className="tabs">
+            <div className={`tab ${activeTab === 'analysis' ? 'active' : ''}`} onClick={() => setActiveTab('analysis')}>Analysis</div>
+            <div className={`tab ${activeTab === 'raw' ? 'active' : ''}`} onClick={() => setActiveTab('raw')}>Raw Numbers</div>
+          </div>
+
+          {activeTab === 'analysis' && (
+            <div className="detail-grid">
+              <div className="detail-main">
+                <div className="info-grid">
+                  <div><strong>Bitrate:</strong> {file.bitrate} kbps</div>
+                  <div><strong>Sample Rate:</strong> {file.sample_rate} Hz</div>
+                  <div><strong>Duration:</strong> {file.duration_secs?.toFixed(1)}s</div>
+                  <div><strong>Encoder:</strong> {file.encoder}</div>
+                  {file.lowpass && <div><strong>Lowpass:</strong> {file.lowpass} Hz</div>}
+                </div>
+
+                {file.flags?.length > 0 && (
+                  <div className="flags">
+                    {file.flags.map((f, i) => <span key={i} className="flag">{f}</span>)}
+                  </div>
+                )}
+
+                <IssuesDetected file={file} />
+                <EncodingChain file={file} />
+
+                {file.spectral_details?.spectrogram && <Spectrogram data={file.spectral_details.spectrogram} />}
+                {file.binary_details?.bitrate_timeline && <BitrateChart data={file.binary_details.bitrate_timeline} />}
+                {file.spectral_details?.stereo_correlation && <StereoChart data={file.spectral_details.stereo_correlation} />}
               </div>
 
-              {file.flags?.length > 0 && (
-                <div className="flags">
-                  {file.flags.map((f, i) => <span key={i} className="flag">{f}</span>)}
-                </div>
-              )}
-
-              <IssuesDetected file={file} />
-              <EncodingChain file={file} />
-
-              {file.spectral_details?.spectrogram && <Spectrogram data={file.spectral_details.spectrogram} />}
-              {file.binary_details?.bitrate_timeline && <BitrateChart data={file.binary_details.bitrate_timeline} />}
-              {file.spectral_details?.stereo_correlation && <StereoChart data={file.spectral_details.stereo_correlation} />}
+              <VerdictSummary file={file} />
             </div>
+          )}
 
-            <VerdictSummary file={file} />
-          </div>
+          {activeTab === 'raw' && <RawNumbersViewer file={file} />}
         </div>
       );
     }
@@ -906,6 +941,153 @@
         <div className="chart">
           <h3>Stereo Correlation <span>(L/R channel similarity — 1.0 = mono)</span></h3>
           <canvas ref={ref} style={{height: '160px'}} />
+        </div>
+      );
+    }
+
+    /**
+     * Raw numbers viewer component - shows all numeric values for the file
+     * @param {{ file: AnalysisResult }} props
+     */
+    function RawNumbersViewer({ file }) {
+      const formatValue = (val) => {
+        if (val === null || val === undefined) return '—';
+        if (typeof val === 'boolean') return val ? 'true' : 'false';
+        if (typeof val === 'number') {
+          if (Number.isInteger(val)) return val.toString();
+          return val.toFixed(4);
+        }
+        return String(val);
+      };
+
+      const downloadJSON = () => {
+        const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${file.file_name}_analysis.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      const downloadCSV = () => {
+        const rows = [['Field', 'Value']];
+        const addRows = (obj, prefix = '') => {
+          Object.entries(obj || {}).forEach(([k, v]) => {
+            if (v && typeof v === 'object' && !Array.isArray(v) && k !== 'spectrogram' && k !== 'bitrate_timeline' && k !== 'stereo_correlation') {
+              addRows(v, `${prefix}${k}.`);
+            } else if (!Array.isArray(v) || k === 'flags') {
+              rows.push([`${prefix}${k}`, formatValue(v)]);
+            }
+          });
+        };
+        addRows(file);
+        const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${file.file_name}_analysis.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      const s = file.spectral_details;
+      const b = file.binary_details;
+
+      return (
+        <div className="raw-numbers">
+          <div style={{ marginBottom: '1rem' }}>
+            <button className="export-btn" onClick={downloadJSON}>Export JSON</button>
+            <button className="export-btn" onClick={downloadCSV}>Export CSV</button>
+          </div>
+
+          <div className="raw-section">
+            <h4>Core Results</h4>
+            <table className="raw-table">
+              <tbody>
+                <tr><td>Verdict</td><td className={`raw-value-${file.verdict === 'OK' ? 'good' : file.verdict === 'SUSPECT' ? 'warn' : 'bad'}`}>{file.verdict}</td></tr>
+                <tr><td>Combined Score</td><td>{file.combined_score}/100</td></tr>
+                <tr><td>Spectral Score</td><td>{file.spectral_score}/100</td></tr>
+                <tr><td>Binary Score</td><td>{file.binary_score}/100</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="raw-section">
+            <h4>Audio Properties</h4>
+            <table className="raw-table">
+              <tbody>
+                <tr><td>File Path</td><td>{file.file_path}</td></tr>
+                <tr><td>Bitrate</td><td>{file.bitrate} kbps</td></tr>
+                <tr><td>Sample Rate</td><td>{file.sample_rate} Hz</td></tr>
+                <tr><td>Duration</td><td>{formatValue(file.duration_secs)} seconds</td></tr>
+                <tr><td>Encoder</td><td>{file.encoder}</td></tr>
+                <tr><td>Lowpass</td><td>{file.lowpass ? `${file.lowpass} Hz` : '—'}</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          {s && (
+            <div className="raw-section">
+              <h4>Spectral Analysis</h4>
+              <table className="raw-table">
+                <tbody>
+                  <tr><td>RMS Full</td><td>{formatValue(s.rms_full)} dB</td></tr>
+                  <tr><td>RMS Mid-High (10-15kHz)</td><td>{formatValue(s.rms_mid_high)} dB</td></tr>
+                  <tr><td>RMS High (15-20kHz)</td><td>{formatValue(s.rms_high)} dB</td></tr>
+                  <tr><td>RMS Upper (17-20kHz)</td><td>{formatValue(s.rms_upper)} dB</td></tr>
+                  <tr><td>RMS 19-20kHz</td><td>{formatValue(s.rms_19_20k)} dB</td></tr>
+                  <tr><td>RMS Ultrasonic (20-22kHz)</td><td>{formatValue(s.rms_ultrasonic)} dB</td></tr>
+                  <tr><td>High Drop</td><td>{formatValue(s.high_drop)} dB</td></tr>
+                  <tr><td>Upper Drop</td><td>{formatValue(s.upper_drop)} dB</td></tr>
+                  <tr><td>Ultrasonic Drop</td><td>{formatValue(s.ultrasonic_drop)} dB</td></tr>
+                  <tr><td>Ultrasonic Flatness</td><td>{formatValue(s.ultrasonic_flatness)}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {s && (
+            <div className="raw-section">
+              <h4>Lo-Fi Detection Metrics</h4>
+              <table className="raw-table">
+                <tbody>
+                  <tr><td>Cutoff Variance</td><td className={s.cutoff_variance > 1500 ? 'raw-value-good' : s.cutoff_variance < 200 ? 'raw-value-bad' : ''}>{formatValue(s.cutoff_variance)} Hz</td></tr>
+                  <tr><td>Avg Cutoff Frequency</td><td>{formatValue(s.avg_cutoff_freq)} Hz</td></tr>
+                  <tr><td>Rolloff Slope</td><td className={s.rolloff_slope < 2 ? 'raw-value-bad' : s.rolloff_slope > 5 ? 'raw-value-good' : ''}>{formatValue(s.rolloff_slope)} dB/kHz</td></tr>
+                  <tr><td>Transition Width</td><td className={s.transition_width > 6000 ? 'raw-value-good' : s.transition_width < 500 ? 'raw-value-bad' : ''}>{formatValue(s.transition_width)} Hz</td></tr>
+                  <tr><td>Natural Rolloff</td><td className={s.natural_rolloff ? 'raw-value-good' : ''}>{formatValue(s.natural_rolloff)}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {b && (
+            <div className="raw-section">
+              <h4>Binary Analysis</h4>
+              <table className="raw-table">
+                <tbody>
+                  <tr><td>Re-encoded</td><td className={b.reencoded ? 'raw-value-bad' : 'raw-value-good'}>{formatValue(b.reencoded)}</td></tr>
+                  {b.encoding_chain && <tr><td>Encoding Chain</td><td>{b.encoding_chain}</td></tr>}
+                  {b.original_quality && <tr><td>Original Quality</td><td>{b.original_quality}</td></tr>}
+                  {b.quality_retention && <tr><td>Quality Retention</td><td>{b.quality_retention}</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {file.flags?.length > 0 && (
+            <div className="raw-section">
+              <h4>Flags</h4>
+              <div className="raw-json">{file.flags.join('\n')}</div>
+            </div>
+          )}
+
+          <div className="raw-section">
+            <h4>Full JSON</h4>
+            <div className="raw-json">{JSON.stringify({...file, spectral_details: s ? {...s, spectrogram: s.spectrogram ? '[data]' : null, stereo_correlation: s.stereo_correlation ? '[data]' : null} : null, binary_details: b ? {...b, bitrate_timeline: b.bitrate_timeline ? '[data]' : null} : null}, null, 2)}</div>
+          </div>
         </div>
       );
     }

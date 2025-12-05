@@ -53,14 +53,20 @@
 //!
 //! - [`analyzer`]: Core analysis engine combining binary and spectral methods
 //! - [`mp3`]: MP3 frame parsing and LAME header extraction
-//! - [`report`]: Output formatters (HTML, JSON, CSV)
+//! - [`report`]: Output formatters (JSON, CSV)
 
 pub mod analyzer;
+pub mod db;
 pub mod mp3;
 pub mod report;
+pub mod schema;
 pub mod serve;
 
 pub use analyzer::{AnalysisResult, Analyzer, Verdict};
+pub use db::{
+    CommandLog, Database, DbRecord, DbSummary, DecisionEdge, DecisionGraph, DecisionNode,
+    CURRENT_SCHEMA,
+};
 
 #[cfg(test)]
 mod tests {

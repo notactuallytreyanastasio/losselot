@@ -140,3 +140,25 @@ Key crates:
 - `rayon`: Parallel processing
 - `tiny_http`: Embedded web server
 - `rfd`: GUI file picker (optional, behind `gui` feature)
+- `diesel`: SQLite ORM for decision tracking
+
+## Database Rules
+
+**CRITICAL: NEVER delete the SQLite database (`losselot.db`)**
+
+The database contains valuable decision graph data and analysis history. If you need to clear data:
+1. Use `losselot db backup` to create a backup first
+2. Ask the user before any destructive operation
+3. The `db clear` command was intentionally removed - use backup/restore instead
+
+Database CLI tools:
+```bash
+losselot db nodes      # List decision nodes
+losselot db edges      # List edges
+losselot db graph      # Full graph as JSON
+losselot db add-node   # Add a decision node
+losselot db add-edge   # Add an edge between nodes
+losselot db status     # Update node status
+losselot db commands   # Show recent command log
+losselot db backup     # Create timestamped backup
+```

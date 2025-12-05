@@ -1,4 +1,5 @@
 .PHONY: build release debug test test-verbose clean install uninstall serve analyze gen-test-files fmt lint check help
+.PHONY: db-nodes db-edges db-graph db-commands db-backup db-view goal decision option action outcome obs link status
 
 # Default target
 all: release
@@ -105,6 +106,73 @@ bench:
 	@echo "Timing analysis..."
 	time cargo run --release -- $(FILE)
 
+# ============ Decision Graph ============
+
+BINARY := ./target/release/losselot
+
+# View commands
+db-nodes: release
+	$(BINARY) db nodes
+
+db-edges: release
+	$(BINARY) db edges
+
+db-graph: release
+	$(BINARY) db graph
+
+db-commands: release
+	$(BINARY) db commands
+
+db-backup: release
+	$(BINARY) db backup
+
+db-view: release
+	@echo "Starting server and opening graph viewer..."
+	$(BINARY) serve . --port $(or $(PORT),3001) &
+	@sleep 1
+	open http://localhost:$(or $(PORT),3001)/graph
+
+# Create nodes
+goal: release
+	@test -n "$(T)" || (echo "Usage: make goal T='Your goal title'" && exit 1)
+	$(BINARY) db add-node -t goal "$(T)"
+
+decision: release
+	@test -n "$(T)" || (echo "Usage: make decision T='Your decision title'" && exit 1)
+	$(BINARY) db add-node -t decision "$(T)"
+
+option: release
+	@test -n "$(T)" || (echo "Usage: make option T='Your option title'" && exit 1)
+	$(BINARY) db add-node -t option "$(T)"
+
+action: release
+	@test -n "$(T)" || (echo "Usage: make action T='Your action title'" && exit 1)
+	$(BINARY) db add-node -t action "$(T)"
+
+outcome: release
+	@test -n "$(T)" || (echo "Usage: make outcome T='Your outcome title'" && exit 1)
+	$(BINARY) db add-node -t outcome "$(T)"
+
+obs: release
+	@test -n "$(T)" || (echo "Usage: make obs T='Your observation'" && exit 1)
+	$(BINARY) db add-node -t observation "$(T)"
+
+# Create edges
+link: release
+	@test -n "$(FROM)" || (echo "Usage: make link FROM=1 TO=2 [TYPE=leads_to] [REASON='why']" && exit 1)
+	@test -n "$(TO)" || (echo "Usage: make link FROM=1 TO=2 [TYPE=leads_to] [REASON='why']" && exit 1)
+ifdef REASON
+	$(BINARY) db add-edge $(FROM) $(TO) -t $(or $(TYPE),leads_to) -r "$(REASON)"
+else
+	$(BINARY) db add-edge $(FROM) $(TO) -t $(or $(TYPE),leads_to)
+endif
+
+# Update status
+status: release
+	@test -n "$(ID)" || (echo "Usage: make status ID=1 S=completed" && exit 1)
+	@test -n "$(S)" || (echo "Usage: make status ID=1 S=completed (pending|active|completed|rejected)" && exit 1)
+	$(BINARY) db status $(ID) $(S)
+
 # Help
 help:
 	@echo "Losselot - Audio Forensics Tool"
@@ -156,3 +224,22 @@ help:
 	@echo "  make watch        Auto-run tests on change (needs cargo-watch)"
 	@echo "  make bench FILE=path  Time analysis of a file"
 	@echo "  make doc          Build and open documentation"
+	@echo ""
+	@echo "Decision Graph:"
+	@echo "  make db-nodes     List all decision nodes"
+	@echo "  make db-edges     List all edges"
+	@echo "  make db-graph     Show full graph as JSON"
+	@echo "  make db-commands  Show recent command log"
+	@echo "  make db-backup    Create database backup"
+	@echo "  make db-view      Open graph viewer in browser"
+	@echo ""
+	@echo "  make goal T='...'      Add goal node"
+	@echo "  make decision T='...'  Add decision node"
+	@echo "  make option T='...'    Add option node"
+	@echo "  make action T='...'    Add action node"
+	@echo "  make outcome T='...'   Add outcome node"
+	@echo "  make obs T='...'       Add observation node"
+	@echo ""
+	@echo "  make link FROM=1 TO=2           Link nodes"
+	@echo "  make link FROM=1 TO=2 TYPE=chosen REASON='why'"
+	@echo "  make status ID=1 S=completed    Update node status"

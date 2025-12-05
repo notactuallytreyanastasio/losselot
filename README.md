@@ -248,6 +248,57 @@ For power users who prefer the terminal:
 
 ---
 
+## SQLite Database
+
+Losselot stores analysis results in a SQLite database (`losselot.db`) for tracking, comparison, and historical review.
+
+### Schema Versioning
+
+Each analysis is tagged with a schema version that tracks which detection algorithms were used:
+
+| Version | Name | Features |
+|---------|------|----------|
+| 1.0.0 | initial | binary_analysis, spectral_analysis |
+| 1.1.0 | lofi-detection | + cutoff_variance, rolloff_slope, transition_width, natural_rolloff |
+
+This allows comparing results across algorithm versions and identifying files that need re-analysis.
+
+### Database Tables
+
+```sql
+-- Analysis results with all metrics
+analysis_results (file_path, verdict, scores, spectral_details, ...)
+
+-- Schema version history
+schema_versions (version, name, features, introduced_at)
+
+-- Project tasks for development tracking
+project_tasks (plan_name, category, description, status, priority, ...)
+
+-- Research notes
+research_notes (topic, content, source, tags)
+```
+
+### Programmatic Access
+
+```rust
+use losselot::{Database, CURRENT_SCHEMA};
+
+let db = Database::open()?;
+
+// Store analysis result
+db.insert_result(&result)?;
+
+// Query results
+let transcodes = db.get_results(Some("TRANSCODE"))?;
+
+// Get summary statistics
+let summary = db.get_summary()?;
+println!("{} files analyzed, {} transcodes", summary.total, summary.transcode_count);
+```
+
+---
+
 ## Build from Source
 
 ```bash

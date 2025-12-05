@@ -2,6 +2,7 @@
 //!
 //! `losselot serve ./folder` → starts server, opens browser, shows results
 
+use crate::db::{Database, DecisionGraph};
 use crate::report::Summary;
 use crate::{AnalysisResult, Analyzer};
 use rayon::prelude::*;
@@ -13,6 +14,7 @@ use walkdir::WalkDir;
 
 // Embed the UI directly in the binary
 const UI_HTML: &str = include_str!("ui.html");
+const GRAPH_UI_HTML: &str = include_str!("graph_ui.html");
 
 #[derive(Serialize)]
 struct ApiResponse<T> {
@@ -117,6 +119,34 @@ fn handle_request(mut request: Request, default_path: &str) -> std::io::Result<(
             request.respond(response)
         }
 
+        // API: Get decision graph
+        (&Method::Get, "/api/graph") => {
+            let graph = get_decision_graph();
+            let json = serde_json::to_string(&ApiResponse::success(graph))?;
+
+            let response = Response::from_string(json)
+                .with_header(Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap());
+            request.respond(response)
+        }
+
+        // API: Get command log
+        (&Method::Get, "/api/commands") => {
+            let commands = get_command_log();
+            let json = serde_json::to_string(&ApiResponse::success(commands))?;
+
+            let response = Response::from_string(json)
+                .with_header(Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap());
+            request.respond(response)
+        }
+
+        // Decision graph viewer page
+        (&Method::Get, "/graph") => {
+            let html = get_graph_viewer_html();
+            let response = Response::from_string(html)
+                .with_header(Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).unwrap());
+            request.respond(response)
+        }
+
         // 404
         _ => {
             let response = Response::from_string("Not found").with_status_code(404);
@@ -196,4 +226,22 @@ fn run_analysis(params: &AnalyzeParams) -> AnalysisReport {
             skip_spectral: params.skip_spectral,
         },
     }
+}
+
+fn get_decision_graph() -> DecisionGraph {
+    match Database::open() {
+        Ok(db) => db.get_graph().unwrap_or_else(|_| DecisionGraph { nodes: vec![], edges: vec![] }),
+        Err(_) => DecisionGraph { nodes: vec![], edges: vec![] },
+    }
+}
+
+fn get_command_log() -> Vec<crate::db::CommandLog> {
+    match Database::open() {
+        Ok(db) => db.get_recent_commands(100).unwrap_or_default(),
+        Err(_) => vec![],
+    }
+}
+
+fn get_graph_viewer_html() -> String {
+    GRAPH_UI_HTML.to_string()
 }
