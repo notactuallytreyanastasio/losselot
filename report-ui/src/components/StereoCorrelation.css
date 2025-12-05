@@ -1,0 +1,52 @@
+.stereo-correlation-container {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+.stereo-correlation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.stereo-correlation-header h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.stereo-correlation-header .subtitle {
+  font-size: 0.75rem;
+  color: var(--dim);
+}
+
+.stereo-stats {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.correlation-value {
+  font-size: 0.75rem;
+  color: var(--dim);
+  font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+.correlation-range {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6875rem;
+  color: var(--dim);
+  margin-top: 0.5rem;
+}

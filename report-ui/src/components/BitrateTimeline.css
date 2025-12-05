@@ -1,0 +1,48 @@
+.bitrate-timeline-container {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+.bitrate-timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.bitrate-timeline-header h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.bitrate-badges {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.vbr-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.vbr-badge.vbr {
+  background: rgba(0, 122, 255, 0.1);
+  color: #007aff;
+}
+
+.vbr-badge.cbr {
+  background: rgba(134, 134, 139, 0.1);
+  color: #86868b;
+}
+
+.bitrate-range {
+  font-size: 0.75rem;
+  color: var(--dim);
+}

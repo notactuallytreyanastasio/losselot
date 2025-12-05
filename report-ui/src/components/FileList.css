@@ -1,0 +1,130 @@
+.file-list-container {
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.file-list {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.file-list th,
+.file-list td {
+  padding: 0.875rem 1rem;
+  text-align: left;
+}
+
+.file-list th {
+  background: rgba(0, 0, 0, 0.03);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--dim);
+}
+
+.file-list th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.file-list th.sortable:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.sort-indicator {
+  margin-left: 0.25rem;
+}
+
+.file-list tbody tr {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.file-list tbody tr:hover {
+  background: rgba(0, 122, 255, 0.04);
+}
+
+.file-list tbody tr.selected {
+  background: rgba(0, 122, 255, 0.08);
+}
+
+.file-list tbody tr:not(:last-child) td {
+  border-bottom: 1px solid var(--border);
+}
+
+.verdict-badge {
+  display: inline-block;
+  padding: 0.25rem 0.625rem;
+  border-radius: 20px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.score-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.score-bar {
+  width: 60px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.score-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.score-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  min-width: 3ch;
+}
+
+.encoder-cell {
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 0.8125rem;
+}
+
+.flags-cell {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.flag-tag {
+  display: inline-block;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 0.6875rem;
+}
+
+.flag-more {
+  font-size: 0.6875rem;
+  color: var(--dim);
+}
+
+.filename-cell {
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 0.8125rem;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dim {
+  color: var(--dim);
+}

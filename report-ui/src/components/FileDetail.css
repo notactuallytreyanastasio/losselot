@@ -1,0 +1,149 @@
+.file-detail {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 2rem;
+}
+
+.file-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.file-detail-title h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+}
+
+.file-path {
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 0.75rem;
+  color: var(--dim);
+}
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 50%;
+  font-size: 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dim);
+  transition: background 0.15s ease;
+}
+
+.close-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.file-detail-summary {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.verdict-large {
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.detail-stats {
+  display: flex;
+  gap: 2rem;
+}
+
+.detail-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-stat .stat-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.detail-stat .stat-label {
+  font-size: 0.6875rem;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.file-detail-flags {
+  margin-bottom: 1.5rem;
+}
+
+.file-detail-flags h4 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+}
+
+.flags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.flags-list .flag-tag {
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 0.75rem;
+}
+
+.file-detail-visualizations {
+  display: grid;
+  gap: 1rem;
+}
+
+.spectral-details {
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.spectral-details h4 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+}
+
+.spectral-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.spectral-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.spectral-item .value {
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+.spectral-item .label {
+  font-size: 0.6875rem;
+  color: var(--dim);
+}
