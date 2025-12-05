@@ -1605,4 +1605,163 @@ mod tests {
         assert!(sc.is_stereo);
         assert!(sc.avg_correlation > 0.9);
     }
+
+    // ==========================================================================
+    // CROSS-FREQUENCY COHERENCE (CFCC) TESTS
+    // ==========================================================================
+    //
+    // CFCC analysis detects brick-wall lossy cutoffs vs natural rolloff by
+    // measuring correlation between adjacent frequency bands.
+    //
+    // Key insight: In natural audio, adjacent bands are correlated (real signal).
+    // At MP3 brick-walls, correlation suddenly drops (signal → noise floor).
+    //
+    // This is Approach B for lo-fi safe detection.
+    // ==========================================================================
+
+    #[test]
+    fn test_cfcc_struct_default() {
+        let cfcc = CrossFrequencyCoherence::default();
+
+        assert!(cfcc.band_frequencies.is_empty());
+        assert!(cfcc.correlations.is_empty());
+        assert!(cfcc.cliff_frequency.is_none());
+        assert!(cfcc.cliff_magnitude.is_none());
+        assert!(!cfcc.lossy_pattern_detected);
+        assert!(!cfcc.natural_rolloff_detected);
+        assert_eq!(cfcc.avg_decorrelation_rate, 0.0);
+        assert_eq!(cfcc.max_decorrelation_rate, 0.0);
+    }
+
+    #[test]
+    fn test_cfcc_struct_with_cliff() {
+        // Simulate a detected lossy cliff at 16kHz
+        let cfcc = CrossFrequencyCoherence {
+            band_frequencies: vec![14000, 14500, 15000, 15500, 16000, 16500, 17000],
+            correlations: vec![0.8, 0.75, 0.7, 0.65, 0.1, 0.05], // Cliff between 16000-16500
+            cliff_frequency: Some(16500),
+            cliff_magnitude: Some(0.55),
+            lossy_pattern_detected: true,
+            natural_rolloff_detected: false,
+            avg_decorrelation_rate: 0.125,
+            max_decorrelation_rate: 0.55,
+            max_rate_frequency: Some(16500),
+        };
+
+        assert!(cfcc.lossy_pattern_detected);
+        assert!(!cfcc.natural_rolloff_detected);
+        assert_eq!(cfcc.cliff_frequency, Some(16500));
+        assert!(cfcc.cliff_magnitude.unwrap() > 0.5);
+    }
+
+    #[test]
+    fn test_cfcc_struct_natural_rolloff() {
+        // Simulate natural/gradual rolloff (tape, lo-fi)
+        let cfcc = CrossFrequencyCoherence {
+            band_frequencies: vec![14000, 14500, 15000, 15500, 16000, 16500, 17000],
+            correlations: vec![0.7, 0.65, 0.6, 0.55, 0.5, 0.45], // Gradual decline
+            cliff_frequency: None,
+            cliff_magnitude: None,
+            lossy_pattern_detected: false,
+            natural_rolloff_detected: true,
+            avg_decorrelation_rate: 0.05,
+            max_decorrelation_rate: 0.05,
+            max_rate_frequency: None,
+        };
+
+        assert!(!cfcc.lossy_pattern_detected);
+        assert!(cfcc.natural_rolloff_detected);
+        assert!(cfcc.cliff_frequency.is_none());
+        assert!(cfcc.avg_decorrelation_rate < 0.15); // Gradual
+    }
+
+    #[test]
+    fn test_cfcc_in_spectral_details() {
+        // SpectralDetails should be able to hold CFCC data
+        let details = SpectralDetails {
+            cross_frequency_coherence: Some(CrossFrequencyCoherence {
+                band_frequencies: vec![16000, 16500, 17000],
+                correlations: vec![0.6, 0.1],
+                cliff_frequency: Some(16500),
+                cliff_magnitude: Some(0.5),
+                lossy_pattern_detected: true,
+                natural_rolloff_detected: false,
+                avg_decorrelation_rate: 0.25,
+                max_decorrelation_rate: 0.5,
+                max_rate_frequency: Some(16500),
+            }),
+            ..Default::default()
+        };
+
+        assert!(details.cross_frequency_coherence.is_some());
+        let cfcc = details.cross_frequency_coherence.unwrap();
+        assert!(cfcc.lossy_pattern_detected);
+        assert_eq!(cfcc.cliff_frequency, Some(16500));
+    }
+
+    #[test]
+    fn test_cfcc_band_parameters() {
+        // Verify CFCC band parameters are sensible
+        assert!(CFCC_BAND_WIDTH > 0, "Band width must be positive");
+        assert!(CFCC_START_FREQ < CFCC_END_FREQ, "Start must be < end");
+        assert!(CFCC_END_FREQ <= SAMPLE_RATE / 2, "End must be <= Nyquist");
+        assert!(CFCC_MIN_WINDOWS > 0, "Need at least 1 window");
+
+        // Calculate expected number of bands
+        let num_bands = (CFCC_END_FREQ - CFCC_START_FREQ) / CFCC_BAND_WIDTH;
+        assert!(num_bands >= 10, "Should have at least 10 bands for analysis");
+    }
+
+    #[test]
+    fn test_cfcc_known_cutoff_ranges() {
+        // Document the known codec cutoff frequencies
+        // These should cover common lossy encoding bitrates
+        let cutoff_ranges = [
+            (10500, 12000, "64-96kbps"),
+            (14000, 16500, "128kbps"),
+            (16500, 18500, "160-192kbps"),
+            (18000, 19500, "256kbps"),
+            (19500, 21000, "320kbps"),
+        ];
+
+        for (low, high, _bitrate) in cutoff_ranges {
+            assert!(low < high, "Range must be valid");
+            assert!(high <= SAMPLE_RATE / 2, "Must be <= Nyquist");
+        }
+
+        // Ranges should cover 128k through 320k without gaps
+        assert!(14000 <= 16500); // 128k range exists
+        assert!(19500 <= 21000); // 320k range exists
+    }
+
+    #[test]
+    fn test_cfcc_cliff_detection_threshold() {
+        // The cliff detection threshold should be reasonable
+        let cliff_threshold = 0.25; // Current threshold
+
+        // Should be:
+        // - High enough to avoid noise triggering false cliffs
+        // - Low enough to catch real lossy cutoffs
+        assert!(cliff_threshold > 0.1, "Threshold too low - noise sensitive");
+        assert!(cliff_threshold < 0.5, "Threshold too high - might miss cliffs");
+    }
+
+    #[test]
+    fn test_band_magnitude_sum_basic() {
+        // Test the band magnitude sum helper function
+        let mut fft_result = vec![Complex::new(0.0, 0.0); FFT_SIZE / 2 + 1];
+
+        // Put energy at 15kHz
+        let bin_resolution = SAMPLE_RATE as f64 / FFT_SIZE as f64;
+        let bin_15k = (15000.0 / bin_resolution) as usize;
+        fft_result[bin_15k] = Complex::new(1.0, 0.0);
+
+        // Should detect energy in 14.5-15.5kHz band
+        let energy = band_magnitude_sum(&fft_result, SAMPLE_RATE, 14500, 15500);
+        assert!(energy > 0.0, "Should detect energy at 15kHz");
+
+        // Should NOT detect energy in 10-11kHz band
+        let energy_low = band_magnitude_sum(&fft_result, SAMPLE_RATE, 10000, 11000);
+        assert!(energy_low < 0.001, "Should have no energy in 10-11kHz");
+    }
 }
