@@ -185,6 +185,7 @@ pub fn analyze(data: &[u8], _declared_sample_rate: u32) -> SpectralResult {
     let hop_size = FFT_SIZE / 2;
     let num_windows = (samples.len() - FFT_SIZE) / hop_size + 1;
 
+    let mut avg_full = 0.0;
     let mut avg_mid_high = 0.0;
     let mut avg_high = 0.0;
     let mut avg_upper = 0.0;
@@ -207,24 +208,27 @@ pub fn analyze(data: &[u8], _declared_sample_rate: u32) -> SpectralResult {
         // Perform FFT
         fft.process(&mut buffer);
 
-        // Calculate band energies
+        // Calculate band energies (all from FFT for fair comparison)
+        avg_full += band_energy(&buffer, sample_rate, 20, 20000); // Full audible range
         avg_mid_high += band_energy(&buffer, sample_rate, 10000, 15000);
         avg_high += band_energy(&buffer, sample_rate, 15000, 20000);
         avg_upper += band_energy(&buffer, sample_rate, 17000, 20000);
     }
 
     let num_windows = num_windows.max(1) as f64;
+    avg_full /= num_windows;
     avg_mid_high /= num_windows;
     avg_high /= num_windows;
     avg_upper /= num_windows;
 
     // Convert to dB
+    result.details.rms_full = to_db(avg_full);
     result.details.rms_mid_high = to_db(avg_mid_high);
     result.details.rms_high = to_db(avg_high);
     result.details.rms_upper = to_db(avg_upper);
 
-    // Calculate drops
-    result.details.high_drop = rms_full - result.details.rms_high;
+    // Calculate drops (positive = high band is quieter, which is normal)
+    result.details.high_drop = result.details.rms_full - result.details.rms_high;
     result.details.upper_drop = result.details.rms_mid_high - result.details.rms_upper;
 
     // Score based on analysis

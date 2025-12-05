@@ -214,10 +214,13 @@ pub fn scan_frames<R: Read + Seek>(reader: &mut R, max_frames: usize) -> io::Res
     let mut unique_bitrates = std::collections::HashSet::new();
 
     // Skip ID3v2 tag if present
+    // ID3v2 header: "ID3" (3) + version (2) + flags (1) + size (4) = 10 bytes
     reader.seek(SeekFrom::Start(0))?;
     reader.read_exact(&mut buf[..3])?;
 
     if &buf[..3] == b"ID3" {
+        // Skip version (2 bytes) and flags (1 byte), then read size (4 bytes)
+        reader.seek(SeekFrom::Start(6))?;
         reader.read_exact(&mut buf)?;
         let size = ((buf[0] as u32 & 0x7F) << 21)
             | ((buf[1] as u32 & 0x7F) << 14)
@@ -267,10 +270,13 @@ pub fn find_sync<R: Read + Seek>(reader: &mut R) -> io::Result<Option<u64>> {
     let mut buf = [0u8; 4];
 
     // Skip ID3v2 tag if present
+    // ID3v2 header: "ID3" (3) + version (2) + flags (1) + size (4) = 10 bytes
     reader.seek(SeekFrom::Start(0))?;
     reader.read_exact(&mut buf[..3])?;
 
     let start_pos = if &buf[..3] == b"ID3" {
+        // Skip to size field at offset 6, then read 4 bytes
+        reader.seek(SeekFrom::Start(6))?;
         reader.read_exact(&mut buf)?;
         let size = ((buf[0] as u32 & 0x7F) << 21)
             | ((buf[1] as u32 & 0x7F) << 14)

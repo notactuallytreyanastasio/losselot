@@ -243,16 +243,41 @@ fn find_pattern(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 /// Expected lowpass frequencies for different bitrates
 /// If actual lowpass is significantly lower than expected, it's likely a transcode
 pub fn expected_lowpass_for_bitrate(bitrate: u32) -> u32 {
-    match bitrate {
-        320 => 20500,
-        256 => 20000,
-        224 => 19500,
-        192 => 18500,
-        160 => 17500,
-        128 => 16000,
-        112 => 15500,
-        96 => 15000,
-        _ => 14000,
+    // Approximate expected lowpass based on bitrate
+    // These are rough estimates; actual values vary by encoder
+    if bitrate >= 320 {
+        20500
+    } else if bitrate >= 256 {
+        20000
+    } else if bitrate >= 224 {
+        19500
+    } else if bitrate >= 192 {
+        18500
+    } else if bitrate >= 160 {
+        17500
+    } else if bitrate >= 128 {
+        16000
+    } else if bitrate >= 112 {
+        15500
+    } else if bitrate >= 96 {
+        15000
+    } else {
+        14000
+    }
+}
+
+/// Minimum acceptable lowpass for a bitrate (below this = suspicious)
+fn min_acceptable_lowpass(bitrate: u32) -> u32 {
+    if bitrate >= 256 {
+        18000  // 256+ kbps should have at least 18kHz
+    } else if bitrate >= 192 {
+        17000  // 192+ kbps should have at least 17kHz
+    } else if bitrate >= 160 {
+        16000  // 160+ kbps should have at least 16kHz
+    } else if bitrate >= 128 {
+        15000  // 128+ kbps should have at least 15kHz
+    } else {
+        0  // Don't flag very low bitrates
     }
 }
 
@@ -260,19 +285,13 @@ pub fn expected_lowpass_for_bitrate(bitrate: u32) -> u32 {
 /// Returns (is_suspicious, expected_lowpass, reason)
 pub fn check_lowpass_mismatch(bitrate: u32, actual_lowpass: u32) -> (bool, u32, Option<String>) {
     let expected = expected_lowpass_for_bitrate(bitrate);
+    let threshold = min_acceptable_lowpass(bitrate);
 
     // If actual lowpass is significantly lower than expected, it's suspicious
-    let threshold = match bitrate {
-        320 => 19000,  // 320kbps should have at least 19kHz
-        256 => 18500,  // 256kbps should have at least 18.5kHz
-        224 => 18000,
-        192 => 17500,
-        160 => 16500,
-        _ => 0, // Don't flag lower bitrates
-    };
-
     if threshold > 0 && actual_lowpass > 0 && actual_lowpass < threshold {
         let likely_source = match actual_lowpass {
+            lp if lp <= 11000 => "64kbps or lower",
+            lp if lp <= 14000 => "96kbps",
             lp if lp <= 16000 => "128kbps",
             lp if lp <= 17500 => "160kbps",
             lp if lp <= 18500 => "192kbps",
