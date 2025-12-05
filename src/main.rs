@@ -1,7 +1,7 @@
 use chrono::Local;
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
-use losselot::{AnalysisResult, Analyzer, Verdict};
+use losselot::{AnalysisResult, Analyzer, Database, Verdict};
 use rayon::prelude::*;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -21,7 +21,7 @@ struct Args {
     #[arg(long)]
     gui: bool,
 
-    /// Output report file (.html, .csv, .json)
+    /// Output report file (.csv, .json)
     #[arg(short, long)]
     output: Option<PathBuf>,
 
@@ -29,7 +29,7 @@ struct Args {
     #[arg(long, default_value = "losselot-reports")]
     report_dir: PathBuf,
 
-    /// Don't auto-generate HTML report
+    /// Don't auto-generate CSV report
     #[arg(long)]
     no_report: bool,
 
@@ -69,6 +69,78 @@ enum Command {
         #[arg(short, long, default_value = "3001")]
         port: u16,
     },
+
+    /// Database operations for decision graph
+    Db {
+        #[command(subcommand)]
+        action: DbAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum DbAction {
+    /// List all decision nodes
+    Nodes,
+
+    /// List all edges
+    Edges,
+
+    /// Show full graph as JSON
+    Graph,
+
+    /// Add a new decision node
+    AddNode {
+        /// Node type: goal, decision, option, action, outcome, observation
+        #[arg(short = 't', long)]
+        node_type: String,
+
+        /// Title of the node
+        title: String,
+
+        /// Optional description
+        #[arg(short, long)]
+        description: Option<String>,
+    },
+
+    /// Add an edge between nodes
+    AddEdge {
+        /// Source node ID
+        from: i32,
+
+        /// Target node ID
+        to: i32,
+
+        /// Edge type: leads_to, requires, chosen, rejected, blocks, enables
+        #[arg(short = 't', long, default_value = "leads_to")]
+        edge_type: String,
+
+        /// Rationale for this edge
+        #[arg(short, long)]
+        rationale: Option<String>,
+    },
+
+    /// Update node status
+    Status {
+        /// Node ID
+        id: i32,
+
+        /// New status: pending, active, completed, rejected
+        status: String,
+    },
+
+    /// Show recent commands
+    Commands {
+        /// Number of commands to show
+        #[arg(short, long, default_value = "20")]
+        limit: i64,
+    },
+
+    /// Create a backup of the database
+    Backup {
+        /// Output path for backup (default: losselot_backup_<timestamp>.db)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
 }
 
 fn main() {
@@ -82,6 +154,10 @@ fn main() {
                     eprintln!("Server error: {}", e);
                     std::process::exit(1);
                 }
+                return;
+            }
+            Command::Db { action } => {
+                handle_db_action(action);
                 return;
             }
         }
@@ -281,7 +357,7 @@ fn main() {
         // Auto-generate report
         std::fs::create_dir_all(&args.report_dir).ok();
         let timestamp = Local::now().format("%Y%m%d_%H%M%S");
-        let filename = format!("losselot_report_{}.html", timestamp);
+        let filename = format!("losselot_report_{}.csv", timestamp);
         Some(args.report_dir.join(filename))
     } else {
         None
@@ -354,5 +430,134 @@ fn truncate(s: &str, max_len: usize) -> String {
         s.to_string()
     } else {
         format!("{}...", &s[..max_len - 3])
+    }
+}
+
+fn handle_db_action(action: DbAction) {
+    let db = match Database::open() {
+        Ok(db) => db,
+        Err(e) => {
+            eprintln!("Failed to open database: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    match action {
+        DbAction::Nodes => {
+            match db.get_all_nodes() {
+                Ok(nodes) => {
+                    if nodes.is_empty() {
+                        println!("No nodes found.");
+                    } else {
+                        println!("{:<5} {:<12} {:<10} {}", "ID", "TYPE", "STATUS", "TITLE");
+                        println!("{}", "-".repeat(60));
+                        for n in nodes {
+                            println!("{:<5} {:<12} {:<10} {}", n.id, n.node_type, n.status, n.title);
+                        }
+                    }
+                }
+                Err(e) => eprintln!("Error: {}", e),
+            }
+        }
+
+        DbAction::Edges => {
+            match db.get_all_edges() {
+                Ok(edges) => {
+                    if edges.is_empty() {
+                        println!("No edges found.");
+                    } else {
+                        println!("{:<5} {:<6} {:<6} {:<12} {}", "ID", "FROM", "TO", "TYPE", "RATIONALE");
+                        println!("{}", "-".repeat(60));
+                        for e in edges {
+                            println!(
+                                "{:<5} {:<6} {:<6} {:<12} {}",
+                                e.id,
+                                e.from_node_id,
+                                e.to_node_id,
+                                e.edge_type,
+                                e.rationale.unwrap_or_default()
+                            );
+                        }
+                    }
+                }
+                Err(e) => eprintln!("Error: {}", e),
+            }
+        }
+
+        DbAction::Graph => {
+            match db.get_graph() {
+                Ok(graph) => {
+                    match serde_json::to_string_pretty(&graph) {
+                        Ok(json) => println!("{}", json),
+                        Err(e) => eprintln!("Error serializing graph: {}", e),
+                    }
+                }
+                Err(e) => eprintln!("Error: {}", e),
+            }
+        }
+
+        DbAction::AddNode { node_type, title, description } => {
+            match db.create_node(&node_type, &title, description.as_deref()) {
+                Ok(id) => println!("Created node {} (type: {}, title: {})", id, node_type, title),
+                Err(e) => eprintln!("Error: {}", e),
+            }
+        }
+
+        DbAction::AddEdge { from, to, edge_type, rationale } => {
+            match db.create_edge(from, to, &edge_type, rationale.as_deref()) {
+                Ok(id) => println!("Created edge {} ({} -> {} via {})", id, from, to, edge_type),
+                Err(e) => eprintln!("Error: {}", e),
+            }
+        }
+
+        DbAction::Status { id, status } => {
+            match db.update_node_status(id, &status) {
+                Ok(()) => println!("Updated node {} status to '{}'", id, status),
+                Err(e) => eprintln!("Error: {}", e),
+            }
+        }
+
+        DbAction::Commands { limit } => {
+            match db.get_recent_commands(limit) {
+                Ok(commands) => {
+                    if commands.is_empty() {
+                        println!("No commands logged.");
+                    } else {
+                        for c in commands {
+                            println!(
+                                "[{}] {} (exit: {})",
+                                c.started_at,
+                                truncate(&c.command, 60),
+                                c.exit_code.map(|c| c.to_string()).unwrap_or_else(|| "running".to_string())
+                            );
+                        }
+                    }
+                }
+                Err(e) => eprintln!("Error: {}", e),
+            }
+        }
+
+        DbAction::Backup { output } => {
+            let db_path = Database::db_path();
+            if !db_path.exists() {
+                eprintln!("No database found at {}", db_path.display());
+                return;
+            }
+
+            let backup_path = output.unwrap_or_else(|| {
+                let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+                PathBuf::from(format!("losselot_backup_{}.db", timestamp))
+            });
+
+            match std::fs::copy(&db_path, &backup_path) {
+                Ok(bytes) => {
+                    println!("Backup created: {} ({} bytes)", backup_path.display(), bytes);
+                }
+                Err(e) => {
+                    eprintln!("Failed to create backup: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
     }
 }

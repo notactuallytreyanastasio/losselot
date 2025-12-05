@@ -126,6 +126,32 @@ pub struct SpectralDetails {
     pub ultrasonic_drop: f64,
     /// Spectral flatness in 19-21kHz (1.0 = noise-like, 0.0 = tonal/empty)
     pub ultrasonic_flatness: f64,
+
+    // === Lo-Fi Detection Metrics ===
+    // These help distinguish natural analog rolloff from lossy brick-wall cutoffs
+
+    /// Standard deviation of detected cutoff frequency across time windows (Hz)
+    /// Low variance (<200 Hz) = fixed cutoff = likely lossy codec
+    /// High variance (>500 Hz) = varying cutoff = likely natural/analog source
+    pub cutoff_variance: f64,
+
+    /// Average detected cutoff frequency across all windows (Hz)
+    /// Where the -20dB point typically falls
+    pub avg_cutoff_freq: f64,
+
+    /// Rolloff slope in the 12-20kHz region (dB per kHz)
+    /// Very steep (>10 dB/kHz) = brick-wall = lossy
+    /// Gradual (<5 dB/kHz) = natural rolloff = analog/lo-fi safe
+    pub rolloff_slope: f64,
+
+    /// Transition width from -3dB to -40dB below HF peak (Hz)
+    /// Narrow (<500 Hz) = brick-wall = lossy
+    /// Wide (>2000 Hz) = gradual = natural rolloff
+    pub transition_width: f64,
+
+    /// Whether this appears to be a natural/analog rolloff vs lossy brick-wall
+    pub natural_rolloff: bool,
+
     /// Spectrogram data for visualization (None if not generated)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spectrogram: Option<SpectrogramData>,
@@ -405,6 +431,157 @@ fn analyze_stereo_correlation(data: &[u8]) -> Option<StereoCorrelation> {
     })
 }
 
+/// Detect the cutoff frequency in an FFT window
+/// Returns the frequency (Hz) where energy drops significantly below the reference band
+/// Uses the -20dB point relative to the 8-12kHz reference band
+fn detect_cutoff_frequency(fft_result: &[Complex<f64>], sample_rate: u32) -> f64 {
+    let bin_resolution = sample_rate as f64 / FFT_SIZE as f64;
+    let nyquist_bin = FFT_SIZE / 2;
+
+    // Get reference energy from 8-12kHz band (stable mid-high region)
+    let ref_low_bin = (8000.0 / bin_resolution) as usize;
+    let ref_high_bin = (12000.0 / bin_resolution) as usize;
+
+    let mut ref_energy = 0.0;
+    let mut ref_count = 0;
+    for bin in ref_low_bin..=ref_high_bin.min(fft_result.len() - 1) {
+        let mag = fft_result[bin].norm();
+        ref_energy += mag;
+        ref_count += 1;
+    }
+    let ref_avg = if ref_count > 0 { ref_energy / ref_count as f64 } else { 1.0 };
+    let ref_db = to_db(ref_avg);
+
+    // Scan upward from 12kHz looking for where energy drops 20dB below reference
+    let threshold_db = ref_db - 20.0;
+    let start_bin = (12000.0 / bin_resolution) as usize;
+
+    for bin in start_bin..nyquist_bin.min(fft_result.len()) {
+        let mag = fft_result[bin].norm();
+        let db = to_db(mag);
+
+        if db < threshold_db {
+            // Found the cutoff point
+            return bin as f64 * bin_resolution;
+        }
+    }
+
+    // No cutoff found - energy extends to Nyquist (true lossless behavior)
+    (sample_rate / 2) as f64
+}
+
+/// Measure the rolloff slope in the 12-20kHz region (dB per kHz)
+/// Steeper slopes indicate brick-wall cutoffs (lossy), gentler slopes indicate natural rolloff
+fn measure_rolloff_slope(fft_result: &[Complex<f64>], sample_rate: u32) -> f64 {
+    let bin_resolution = sample_rate as f64 / FFT_SIZE as f64;
+
+    // Sample energy at several points in the 12-20kHz region
+    let freq_points = [12000.0, 14000.0, 16000.0, 18000.0, 20000.0];
+    let mut energies_db: Vec<(f64, f64)> = Vec::new(); // (freq_khz, db)
+
+    for &freq in &freq_points {
+        let bin = (freq / bin_resolution) as usize;
+        if bin < fft_result.len() {
+            // Average a small band around the target frequency
+            let mut sum = 0.0;
+            let mut count = 0;
+            for b in bin.saturating_sub(2)..=(bin + 2).min(fft_result.len() - 1) {
+                sum += fft_result[b].norm();
+                count += 1;
+            }
+            let avg_mag = if count > 0 { sum / count as f64 } else { 0.0 };
+            energies_db.push((freq / 1000.0, to_db(avg_mag)));
+        }
+    }
+
+    if energies_db.len() < 2 {
+        return 0.0;
+    }
+
+    // Linear regression to find slope (dB per kHz)
+    // Using simple least squares: slope = Σ(x-x̄)(y-ȳ) / Σ(x-x̄)²
+    let n = energies_db.len() as f64;
+    let x_mean: f64 = energies_db.iter().map(|(x, _)| x).sum::<f64>() / n;
+    let y_mean: f64 = energies_db.iter().map(|(_, y)| y).sum::<f64>() / n;
+
+    let mut numerator = 0.0;
+    let mut denominator = 0.0;
+    for (x, y) in &energies_db {
+        let x_diff = x - x_mean;
+        let y_diff = y - y_mean;
+        numerator += x_diff * y_diff;
+        denominator += x_diff * x_diff;
+    }
+
+    if denominator.abs() < 1e-10 {
+        return 0.0;
+    }
+
+    // Return absolute value - we care about steepness, not direction
+    // (slope is always negative for rolloff, we want the magnitude)
+    (numerator / denominator).abs()
+}
+
+/// Measure transition width: how many Hz from -3dB to -40dB below reference
+/// Narrow = brick-wall (lossy), Wide = gradual (natural)
+fn measure_transition_width(fft_result: &[Complex<f64>], sample_rate: u32) -> f64 {
+    let bin_resolution = sample_rate as f64 / FFT_SIZE as f64;
+    let nyquist_bin = FFT_SIZE / 2;
+
+    // Get reference energy from 8-12kHz band
+    let ref_low_bin = (8000.0 / bin_resolution) as usize;
+    let ref_high_bin = (12000.0 / bin_resolution) as usize;
+
+    let mut ref_energy = 0.0;
+    let mut ref_count = 0;
+    for bin in ref_low_bin..=ref_high_bin.min(fft_result.len() - 1) {
+        let mag = fft_result[bin].norm();
+        ref_energy += mag;
+        ref_count += 1;
+    }
+    let ref_avg = if ref_count > 0 { ref_energy / ref_count as f64 } else { 1.0 };
+    let ref_db = to_db(ref_avg);
+
+    let threshold_3db = ref_db - 3.0;
+    let threshold_40db = ref_db - 40.0;
+
+    let start_bin = (10000.0 / bin_resolution) as usize;
+    let mut freq_3db: Option<f64> = None;
+    let mut freq_40db: Option<f64> = None;
+
+    for bin in start_bin..nyquist_bin.min(fft_result.len()) {
+        let mag = fft_result[bin].norm();
+        let db = to_db(mag);
+        let freq = bin as f64 * bin_resolution;
+
+        if freq_3db.is_none() && db < threshold_3db {
+            freq_3db = Some(freq);
+        }
+        if freq_40db.is_none() && db < threshold_40db {
+            freq_40db = Some(freq);
+            break; // Found both points
+        }
+    }
+
+    match (freq_3db, freq_40db) {
+        (Some(f3), Some(f40)) => f40 - f3,
+        (Some(f3), None) => (sample_rate as f64 / 2.0) - f3, // Never hit -40dB
+        _ => 0.0,
+    }
+}
+
+/// Calculate standard deviation of a slice of f64 values
+fn std_deviation(values: &[f64]) -> f64 {
+    if values.len() < 2 {
+        return 0.0;
+    }
+
+    let n = values.len() as f64;
+    let mean = values.iter().sum::<f64>() / n;
+    let variance = values.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0);
+    variance.sqrt()
+}
+
 /// Calculate spectral flatness (Wiener entropy)
 /// Returns 1.0 for white noise, 0.0 for pure tone or silence
 fn spectral_flatness(magnitudes: &[f64]) -> f64 {
@@ -480,6 +657,11 @@ pub fn analyze(data: &[u8], _declared_sample_rate: u32) -> SpectralResult {
     // For spectral flatness calculation
     let mut ultrasonic_magnitudes: Vec<f64> = Vec::new();
 
+    // For lo-fi detection: collect per-window metrics
+    let mut cutoff_frequencies: Vec<f64> = Vec::with_capacity(num_windows);
+    let mut rolloff_slopes: Vec<f64> = Vec::with_capacity(num_windows);
+    let mut transition_widths: Vec<f64> = Vec::with_capacity(num_windows);
+
     // For spectrogram: collect downsampled magnitude spectra
     let bin_resolution = sample_rate as f64 / FFT_SIZE as f64;
     let nyquist_bin = FFT_SIZE / 2;
@@ -534,6 +716,14 @@ pub fn analyze(data: &[u8], _declared_sample_rate: u32) -> SpectralResult {
             ultrasonic_magnitudes.push(buffer[bin].norm());
         }
 
+        // Lo-fi detection: measure cutoff frequency, slope, and transition width per window
+        // Only sample every 4th window to reduce computation while still capturing variance
+        if i % 4 == 0 {
+            cutoff_frequencies.push(detect_cutoff_frequency(&buffer, sample_rate));
+            rolloff_slopes.push(measure_rolloff_slope(&buffer, sample_rate));
+            transition_widths.push(measure_transition_width(&buffer, sample_rate));
+        }
+
         // Collect spectrogram data (downsampled)
         if i % time_downsample == 0 {
             let time_sec = (start as f64) / sample_rate as f64;
@@ -583,6 +773,52 @@ pub fn analyze(data: &[u8], _declared_sample_rate: u32) -> SpectralResult {
     // Flatness = geometric_mean / arithmetic_mean (1.0 = white noise, 0.0 = pure tone/silence)
     result.details.ultrasonic_flatness = spectral_flatness(&ultrasonic_magnitudes);
 
+    // Calculate lo-fi detection metrics
+    // Cutoff variance: low = fixed (lossy), high = varying (natural)
+    result.details.cutoff_variance = std_deviation(&cutoff_frequencies);
+    result.details.avg_cutoff_freq = if !cutoff_frequencies.is_empty() {
+        cutoff_frequencies.iter().sum::<f64>() / cutoff_frequencies.len() as f64
+    } else {
+        22050.0 // Default to Nyquist if no measurements
+    };
+
+    // Average rolloff slope (dB/kHz)
+    result.details.rolloff_slope = if !rolloff_slopes.is_empty() {
+        rolloff_slopes.iter().sum::<f64>() / rolloff_slopes.len() as f64
+    } else {
+        0.0
+    };
+
+    // Average transition width (Hz)
+    result.details.transition_width = if !transition_widths.is_empty() {
+        transition_widths.iter().sum::<f64>() / transition_widths.len() as f64
+    } else {
+        0.0
+    };
+
+    // Determine if this is natural rolloff vs lossy brick-wall
+    // Natural rolloff characteristics (CONSERVATIVE - require strong evidence):
+    // - Very high cutoff variance (>1500 Hz) - cutoff moves significantly with content
+    // - Very gradual slope (<2 dB/kHz) - definitely not a cliff
+    // - Very wide transition (>6000 Hz) - takes a long time to roll off
+    //
+    // Note: High-bitrate transcodes (256k, 320k) can have gradual rolloff too,
+    // so we need VERY strong evidence to call something "natural rolloff"
+    let very_high_variance = result.details.cutoff_variance > 1500.0;
+    let very_gradual_slope = result.details.rolloff_slope < 2.0;
+    let very_wide_transition = result.details.transition_width > 6000.0;
+
+    // Only flag as natural if we have strong variance AND at least one other indicator
+    // This helps distinguish cassette tapes (which have genuinely varying cutoffs)
+    // from high-bitrate transcodes (which have consistent but gradual cutoffs)
+    let natural_indicators = [very_high_variance, very_gradual_slope, very_wide_transition]
+        .iter()
+        .filter(|&&x| x)
+        .count();
+
+    // Require high variance as a mandatory condition, plus one other
+    result.details.natural_rolloff = very_high_variance && natural_indicators >= 2;
+
     // Store spectrogram data
     if !spectrogram_times.is_empty() && !spectrogram_magnitudes.is_empty() {
         result.details.spectrogram = Some(SpectrogramData {
@@ -606,20 +842,44 @@ pub fn analyze(data: &[u8], _declared_sample_rate: u32) -> SpectralResult {
     // - Lossy 320k: ~8-12 dB (slight damage)
     // - Lossy 192k: ~12-20 dB (moderate damage)
     // - Lossy 128k MP3: ~40-70 dB (severe damage, hard cutoff)
+    //
+    // IMPORTANT: Natural rolloff (cassettes, vintage masters, lo-fi) can trigger
+    // false positives. If natural_rolloff is detected, we reduce scoring significantly.
+
+    // First, flag if natural rolloff was detected
+    if result.details.natural_rolloff {
+        result.flags.push("natural_rolloff_detected".to_string());
+    }
+
+    // Score multiplier: reduce scores if natural rolloff characteristics detected
+    // 1.0 = full scoring, 0.3 = heavily reduced for natural sources
+    let score_multiplier = if result.details.natural_rolloff { 0.3 } else { 1.0 };
 
     // Severe damage - almost certainly from low-bitrate lossy (MP3 128k or worse)
+    // Unless it's natural rolloff (cassette, vintage master)
     if result.details.upper_drop > 40.0 {
-        result.score += 50;
-        result.flags.push("severe_hf_damage".to_string());
+        let points = (50.0 * score_multiplier) as u32;
+        result.score += points;
+        if result.details.natural_rolloff {
+            result.flags.push("severe_hf_drop_natural".to_string());
+        } else {
+            result.flags.push("severe_hf_damage".to_string());
+        }
     }
     // Significant damage - likely from lossy source (192k or lower)
     else if result.details.upper_drop > 15.0 {
-        result.score += 35;
-        result.flags.push("hf_cutoff_detected".to_string());
+        let points = (35.0 * score_multiplier) as u32;
+        result.score += points;
+        if result.details.natural_rolloff {
+            result.flags.push("hf_cutoff_natural".to_string());
+        } else {
+            result.flags.push("hf_cutoff_detected".to_string());
+        }
     }
     // Mild damage - possibly from high-bitrate lossy (256k-320k)
     else if result.details.upper_drop > 10.0 {
-        result.score += 20;
+        let points = (20.0 * score_multiplier) as u32;
+        result.score += points;
         result.flags.push("possible_lossy_origin".to_string());
     }
 
@@ -630,46 +890,63 @@ pub fn analyze(data: &[u8], _declared_sample_rate: u32) -> SpectralResult {
     // Key metrics from analysis:
     // - Real lossless: ultrasonic_drop ~1-2 dB, flatness ~0.98
     // - Fake 320k: ultrasonic_drop ~50+ dB, flatness ~0.10
+    //
+    // Natural sources (tape, vinyl) may also lack ultrasonic content,
+    // but their cutoff varies with time and content level.
 
-    // Massive cliff at 20kHz - strong indicator of 320k transcode
-    if result.details.ultrasonic_drop > 40.0 {
-        result.score += 35;
-        result.flags.push("cliff_at_20khz".to_string());
-    } else if result.details.ultrasonic_drop > 25.0 {
-        result.score += 25;
-        result.flags.push("steep_20khz_cutoff".to_string());
-    } else if result.details.ultrasonic_drop > 15.0 {
-        result.score += 15;
-        result.flags.push("possible_320k_origin".to_string());
-    }
+    // Only apply 320k detection if NOT natural rolloff
+    // (natural sources like tape won't have consistent 20kHz brick-wall)
+    if !result.details.natural_rolloff {
+        // Massive cliff at 20kHz - strong indicator of 320k transcode
+        if result.details.ultrasonic_drop > 40.0 {
+            result.score += 35;
+            result.flags.push("cliff_at_20khz".to_string());
+        } else if result.details.ultrasonic_drop > 25.0 {
+            result.score += 25;
+            result.flags.push("steep_20khz_cutoff".to_string());
+        } else if result.details.ultrasonic_drop > 15.0 {
+            result.score += 15;
+            result.flags.push("possible_320k_origin".to_string());
+        }
 
-    // Low spectral flatness in 19-21kHz = empty/dead band
-    // Real audio has noise-like content (flatness ~0.9+)
-    // 320k transcode has almost nothing (flatness <0.5)
-    if result.details.ultrasonic_flatness < 0.3 {
-        result.score += 20;
-        result.flags.push("dead_ultrasonic_band".to_string());
-    } else if result.details.ultrasonic_flatness < 0.5 {
-        result.score += 10;
-        result.flags.push("weak_ultrasonic_content".to_string());
+        // Low spectral flatness in 19-21kHz = empty/dead band
+        if result.details.ultrasonic_flatness < 0.3 {
+            result.score += 20;
+            result.flags.push("dead_ultrasonic_band".to_string());
+        } else if result.details.ultrasonic_flatness < 0.5 {
+            result.score += 10;
+            result.flags.push("weak_ultrasonic_content".to_string());
+        }
     }
 
     // Steep overall rolloff (full spectrum to 15-20kHz)
     if result.details.high_drop > 48.0 {
-        result.score += 15;
+        let points = (15.0 * score_multiplier) as u32;
+        result.score += points;
         result.flags.push("steep_hf_rolloff".to_string());
     }
 
     // Silent upper frequencies (absolute check)
+    // Reduced impact if natural rolloff detected
     if result.details.rms_upper < -50.0 {
-        result.score += 15;
+        let points = (15.0 * score_multiplier) as u32;
+        result.score += points;
         result.flags.push("silent_17k+".to_string());
     }
 
     // Very quiet ultrasonic band (absolute check)
-    if result.details.rms_ultrasonic < -70.0 {
+    // Skip if natural rolloff - tape/vinyl won't have ultrasonic content
+    if result.details.rms_ultrasonic < -70.0 && !result.details.natural_rolloff {
         result.score += 10;
         result.flags.push("silent_20k+".to_string());
+    }
+
+    // === BRICK-WALL DETECTION BONUS ===
+    // If we have low cutoff variance AND steep slope, this is almost certainly
+    // a lossy transcode, not natural rolloff. Add extra confidence.
+    if result.details.cutoff_variance < 200.0 && result.details.rolloff_slope > 8.0 {
+        result.score += 15;
+        result.flags.push("brick_wall_cutoff".to_string());
     }
 
     result
