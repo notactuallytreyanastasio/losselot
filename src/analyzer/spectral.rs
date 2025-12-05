@@ -104,6 +104,38 @@ pub struct StereoCorrelation {
     pub channel_count: usize,
 }
 
+// Cross-Frequency Coherence parameters
+// Used to detect brick-wall cutoffs vs natural rolloff
+const CFCC_BAND_WIDTH: u32 = 500; // Hz per band
+const CFCC_START_FREQ: u32 = 10000; // Start analysis at 10kHz
+const CFCC_END_FREQ: u32 = 22000; // End at 22kHz
+const CFCC_MIN_WINDOWS: usize = 10; // Minimum windows for reliable correlation
+
+/// Cross-Frequency Coherence analysis results
+/// Measures correlation between adjacent frequency bands to detect brick-wall cutoffs
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct CrossFrequencyCoherence {
+    /// Center frequencies of analyzed bands (Hz)
+    pub band_frequencies: Vec<u32>,
+    /// Correlation coefficients between adjacent bands
+    /// correlations[i] = correlation between band[i] and band[i+1]
+    pub correlations: Vec<f64>,
+    /// Detected cliff location (frequency where correlation drops suddenly)
+    pub cliff_frequency: Option<u32>,
+    /// Magnitude of the cliff (correlation drop)
+    pub cliff_magnitude: Option<f64>,
+    /// Whether pattern matches lossy encoding (sharp cliff at known codec freq)
+    pub lossy_pattern_detected: bool,
+    /// Whether pattern matches natural rolloff (gradual decorrelation)
+    pub natural_rolloff_detected: bool,
+    /// Average decorrelation rate (d(correlation)/d(frequency))
+    pub avg_decorrelation_rate: f64,
+    /// Maximum decorrelation rate (spike indicates brick-wall)
+    pub max_decorrelation_rate: f64,
+    /// Frequency at maximum decorrelation rate
+    pub max_rate_frequency: Option<u32>,
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct SpectralDetails {
     /// RMS level of full signal (dB)
@@ -132,6 +164,9 @@ pub struct SpectralDetails {
     /// Stereo correlation data (None if mono or not analyzed)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stereo_correlation: Option<StereoCorrelation>,
+    /// Cross-frequency coherence data for brick-wall vs natural rolloff detection
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cross_frequency_coherence: Option<CrossFrequencyCoherence>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -443,6 +478,170 @@ fn band_energy(fft_result: &[Complex<f64>], sample_rate: u32, low_hz: u32, high_
     energy.sqrt()
 }
 
+// ============================================================================
+// CROSS-FREQUENCY COHERENCE ANALYSIS
+// ============================================================================
+// This is the core of Approach B: detecting brick-wall cutoffs by measuring
+// correlation between adjacent frequency bands over time.
+//
+// Key insight: In natural audio, adjacent frequency bands are correlated.
+// MP3 brick-walls create a discontinuity where correlation suddenly drops.
+// ============================================================================
+
+/// Calculate energy in a frequency band for a single FFT window (returns magnitude sum)
+fn band_magnitude_sum(fft_result: &[Complex<f64>], sample_rate: u32, low_hz: u32, high_hz: u32) -> f64 {
+    let bin_resolution = sample_rate as f64 / FFT_SIZE as f64;
+    let low_bin = (low_hz as f64 / bin_resolution) as usize;
+    let high_bin = (high_hz as f64 / bin_resolution).min((FFT_SIZE / 2) as f64) as usize;
+
+    let mut sum = 0.0;
+    for bin in low_bin..=high_bin.min(fft_result.len() - 1) {
+        sum += fft_result[bin].norm();
+    }
+    sum
+}
+
+/// Analyze cross-frequency coherence from collected FFT results
+/// Returns correlation profile and cliff detection
+fn analyze_cross_frequency_coherence(
+    fft_results: &[Vec<Complex<f64>>],
+    sample_rate: u32,
+) -> Option<CrossFrequencyCoherence> {
+    if fft_results.len() < CFCC_MIN_WINDOWS {
+        return None;
+    }
+
+    // Define frequency bands from 10kHz to 22kHz in 500Hz steps
+    let mut band_frequencies: Vec<u32> = Vec::new();
+    let mut freq = CFCC_START_FREQ;
+    while freq < CFCC_END_FREQ {
+        band_frequencies.push(freq);
+        freq += CFCC_BAND_WIDTH;
+    }
+
+    if band_frequencies.len() < 2 {
+        return None;
+    }
+
+    // Calculate energy time-series for each band
+    let mut band_energies: Vec<Vec<f64>> = Vec::new();
+    for &center_freq in &band_frequencies {
+        let low_hz = center_freq;
+        let high_hz = center_freq + CFCC_BAND_WIDTH;
+
+        let energy_series: Vec<f64> = fft_results
+            .iter()
+            .map(|fft| band_magnitude_sum(fft, sample_rate, low_hz, high_hz))
+            .collect();
+
+        band_energies.push(energy_series);
+    }
+
+    // Calculate correlation between adjacent bands
+    let mut correlations: Vec<f64> = Vec::new();
+    for i in 0..(band_energies.len() - 1) {
+        let corr = pearson_correlation(&band_energies[i], &band_energies[i + 1]);
+        correlations.push(corr);
+    }
+
+    if correlations.is_empty() {
+        return None;
+    }
+
+    // Calculate decorrelation rates (change in correlation per frequency step)
+    let mut decorrelation_rates: Vec<f64> = Vec::new();
+    for i in 1..correlations.len() {
+        // Rate is how much correlation dropped from previous band pair
+        let rate = correlations[i - 1] - correlations[i];
+        decorrelation_rates.push(rate);
+    }
+
+    // Find max decorrelation rate (indicates potential cliff)
+    let mut max_rate = 0.0_f64;
+    let mut max_rate_idx = 0;
+    for (i, &rate) in decorrelation_rates.iter().enumerate() {
+        if rate > max_rate {
+            max_rate = rate;
+            max_rate_idx = i;
+        }
+    }
+
+    let avg_rate = if decorrelation_rates.is_empty() {
+        0.0
+    } else {
+        decorrelation_rates.iter().sum::<f64>() / decorrelation_rates.len() as f64
+    };
+
+    // Detect cliff: Look for the largest sudden drop in correlation
+    // The cliff is where we transition from correlated signal to uncorrelated noise
+    let mut cliff_frequency: Option<u32> = None;
+    let mut cliff_magnitude: Option<f64> = None;
+    let mut max_drop = 0.0_f64;
+    let mut max_drop_idx = 0;
+
+    for i in 1..correlations.len() {
+        let prev_corr = correlations[i - 1];
+        let curr_corr = correlations[i];
+        let drop = prev_corr - curr_corr;
+
+        // Track the largest drop
+        if drop > max_drop {
+            max_drop = drop;
+            max_drop_idx = i;
+        }
+    }
+
+    // Cliff detection criteria (relaxed):
+    // 1. The maximum drop is significant (>0.25)
+    // 2. This represents a meaningful transition in the signal
+    if max_drop > 0.25 && max_drop_idx + 1 < band_frequencies.len() {
+        cliff_frequency = Some(band_frequencies[max_drop_idx + 1]);
+        cliff_magnitude = Some(max_drop);
+    }
+
+    // Check if cliff frequency matches known codec cutoffs
+    // Extended ranges to catch real-world variations
+    let known_cutoffs: Vec<(u32, u32)> = vec![
+        (10500, 12000),  // Very low bitrate (64-96kbps)
+        (14000, 16500),  // 128kbps MP3 (can vary with encoder settings)
+        (16500, 18500),  // 160-192kbps MP3
+        (18000, 19500),  // 256kbps MP3
+        (19500, 21000),  // 320kbps MP3
+    ];
+
+    let lossy_pattern_detected = cliff_frequency.map_or(false, |freq| {
+        known_cutoffs.iter().any(|(low, high)| freq >= *low && freq <= *high)
+    });
+
+    // Detect natural rolloff pattern:
+    // - No sudden cliff (max_rate < 0.3)
+    // - Gradual decorrelation (avg_rate between 0.01 and 0.15)
+    // - Correlations generally decrease but smoothly
+    let natural_rolloff_detected =
+        cliff_frequency.is_none() &&
+        max_rate < 0.3 &&
+        avg_rate > 0.0 &&
+        avg_rate < 0.15;
+
+    let max_rate_frequency = if !decorrelation_rates.is_empty() && max_rate_idx + 1 < band_frequencies.len() {
+        Some(band_frequencies[max_rate_idx + 1])
+    } else {
+        None
+    };
+
+    Some(CrossFrequencyCoherence {
+        band_frequencies,
+        correlations,
+        cliff_frequency,
+        cliff_magnitude,
+        lossy_pattern_detected,
+        natural_rolloff_detected,
+        avg_decorrelation_rate: avg_rate,
+        max_decorrelation_rate: max_rate,
+        max_rate_frequency,
+    })
+}
+
 /// Perform spectral analysis on MP3 data
 pub fn analyze(data: &[u8], _declared_sample_rate: u32) -> SpectralResult {
     let mut result = SpectralResult::default();
@@ -479,6 +678,11 @@ pub fn analyze(data: &[u8], _declared_sample_rate: u32) -> SpectralResult {
 
     // For spectral flatness calculation
     let mut ultrasonic_magnitudes: Vec<f64> = Vec::new();
+
+    // For CFCC analysis: collect FFT results from every Nth window
+    // We don't need every window - subsample to reduce memory
+    let cfcc_subsample = (num_windows / 50).max(1); // Target ~50 windows for CFCC
+    let mut cfcc_fft_results: Vec<Vec<Complex<f64>>> = Vec::new();
 
     // For spectrogram: collect downsampled magnitude spectra
     let bin_resolution = sample_rate as f64 / FFT_SIZE as f64;
@@ -532,6 +736,11 @@ pub fn analyze(data: &[u8], _declared_sample_rate: u32) -> SpectralResult {
         let high_bin = (21000.0 / bin_resolution).min((FFT_SIZE / 2) as f64) as usize;
         for bin in low_bin..=high_bin.min(buffer.len() - 1) {
             ultrasonic_magnitudes.push(buffer[bin].norm());
+        }
+
+        // Collect FFT results for CFCC analysis (subsampled)
+        if i % cfcc_subsample == 0 {
+            cfcc_fft_results.push(buffer.clone());
         }
 
         // Collect spectrogram data (downsampled)
@@ -596,6 +805,9 @@ pub fn analyze(data: &[u8], _declared_sample_rate: u32) -> SpectralResult {
 
     // Analyze stereo correlation (separate decode to preserve L/R channels)
     result.details.stereo_correlation = analyze_stereo_correlation(data);
+
+    // Analyze cross-frequency coherence for brick-wall vs natural rolloff detection
+    result.details.cross_frequency_coherence = analyze_cross_frequency_coherence(&cfcc_fft_results, sample_rate);
 
     // Score based on analysis
     // Tuned to detect lossy origins in "lossless" files
@@ -670,6 +882,48 @@ pub fn analyze(data: &[u8], _declared_sample_rate: u32) -> SpectralResult {
     if result.details.rms_ultrasonic < -70.0 {
         result.score += 10;
         result.flags.push("silent_20k+".to_string());
+    }
+
+    // =========================================================================
+    // CROSS-FREQUENCY COHERENCE SCORING (Approach B)
+    // =========================================================================
+    // This is the key innovation: detecting brick-wall cutoffs vs natural rolloff
+    // by analyzing correlation between adjacent frequency bands.
+    //
+    // - Brick-wall (lossy): Sharp correlation cliff at cutoff frequency
+    // - Natural (tape/lofi): Gradual decorrelation, no cliff
+    // =========================================================================
+
+    if let Some(ref cfcc) = result.details.cross_frequency_coherence {
+        // CFCC cliff detected - strong evidence of brick-wall cutoff (lossy)
+        if cfcc.lossy_pattern_detected {
+            result.score += 25;
+            if let Some(freq) = cfcc.cliff_frequency {
+                result.flags.push(format!("cfcc_cliff_{}kHz", freq / 1000));
+            } else {
+                result.flags.push("cfcc_cliff_detected".to_string());
+            }
+        }
+
+        // High decorrelation rate spike (even if not at known codec freq)
+        if cfcc.max_decorrelation_rate > 0.4 {
+            result.score += 15;
+            result.flags.push("decorrelation_spike".to_string());
+        }
+
+        // NATURAL ROLLOFF BONUS (Lo-Fi Safe)
+        // If we detect natural rolloff pattern, REDUCE the score
+        // This prevents false positives on cassette/vintage/lofi sources
+        if cfcc.natural_rolloff_detected {
+            // Natural rolloff detected - this looks like tape/vintage/lofi
+            // Reduce score to prevent false positive
+            if result.score >= 15 {
+                result.score -= 15;
+            } else {
+                result.score = 0;
+            }
+            result.flags.push("lofi_safe_natural_rolloff".to_string());
+        }
     }
 
     result
