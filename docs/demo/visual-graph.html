@@ -65,6 +65,18 @@
         .filter-btn:hover { border-color: #58a6ff; }
         .filter-btn.active { background: #58a6ff; color: #0d1117; border-color: #58a6ff; }
 
+        .nav-section { margin-bottom: 8px; }
+        .nav-link {
+            display: block;
+            padding: 8px 12px;
+            color: #58a6ff;
+            text-decoration: none;
+            font-size: 13px;
+            border-radius: 4px;
+            margin: 2px 0;
+        }
+        .nav-link:hover { background: #21262d; }
+
         .legend {
             position: fixed;
             bottom: 20px;
@@ -230,7 +242,17 @@
     </div>
 
     <div class="controls">
-        <h3>Filter by Type</h3>
+        <h3>Navigation</h3>
+        <div class="nav-section">
+            <a href="../" class="nav-link">Home</a>
+            <a href="../analyzer.html" class="nav-link">WASM Analyzer</a>
+            <a href="../decision-graph" class="nav-link">About Decision Graph</a>
+            <a href="../audio-analysis" class="nav-link">Audio Analysis</a>
+            <a href="../claude-tooling" class="nav-link">Claude Tooling</a>
+            <a href="../story" class="nav-link">Dev Story</a>
+            <a href="./" class="nav-link">List View</a>
+        </div>
+        <h3 style="margin-top: 20px;">Filter by Type</h3>
         <div id="type-filters"></div>
         <h3 style="margin-top: 16px;">Focus Chain</h3>
         <select id="chain-select" style="width: 100%; padding: 8px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px;">
