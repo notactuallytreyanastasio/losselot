@@ -482,112 +482,62 @@
     },
     {
       "id": 49,
-      "node_type": "goal",
-      "title": "Fix decision-graph.md page - broken images, missing live graph, stale data",
+      "node_type": "decision",
+      "title": "WASM UI overhaul: match native serve UI exactly with tabs, sidebar, charts, encoding chain",
       "description": null,
       "status": "pending",
-      "created_at": "2025-12-05T22:05:22.230677-05:00",
-      "updated_at": "2025-12-05T22:05:22.230677-05:00",
+      "created_at": "2025-12-05T21:56:51.778490-05:00",
+      "updated_at": "2025-12-05T21:56:51.778490-05:00",
       "metadata_json": null
     },
     {
       "id": 50,
-      "node_type": "decision",
-      "title": "How to display live graph on decision-graph.md",
+      "node_type": "observation",
+      "title": "WASM can access raw file bytes via arrayBuffer() BEFORE Web Audio decoding - binary analysis IS possible",
       "description": null,
       "status": "pending",
-      "created_at": "2025-12-05T22:05:29.953167-05:00",
-      "updated_at": "2025-12-05T22:05:29.953167-05:00",
+      "created_at": "2025-12-05T21:56:53.144378-05:00",
+      "updated_at": "2025-12-05T21:56:53.144378-05:00",
       "metadata_json": null
     },
     {
       "id": 51,
-      "node_type": "observation",
-      "title": "Current page refs nonexistent images: knowledge_graph.png, goal.png, decision.png, action.png",
+      "node_type": "decision",
+      "title": "Add MP3 binary parsing to WASM - parse raw bytes for LAME headers, encoder sigs, lowpass before FFT",
       "description": null,
       "status": "pending",
-      "created_at": "2025-12-05T22:05:29.963763-05:00",
-      "updated_at": "2025-12-05T22:05:29.963763-05:00",
+      "created_at": "2025-12-05T21:56:53.871501-05:00",
+      "updated_at": "2025-12-05T21:56:53.871501-05:00",
       "metadata_json": null
     },
     {
       "id": 52,
-      "node_type": "observation",
-      "title": "HTML divs in markdown break Jekyll rendering - need pure markdown or inline JS",
+      "node_type": "action",
+      "title": "Added full MP3 binary parsing to WASM: frame headers, LAME/Xing tags, encoder signature scanning, re-encoding chain detection",
       "description": null,
       "status": "pending",
-      "created_at": "2025-12-05T22:05:29.971248-05:00",
-      "updated_at": "2025-12-05T22:05:29.971248-05:00",
+      "created_at": "2025-12-05T22:13:10.828200-05:00",
+      "updated_at": "2025-12-05T22:13:10.828200-05:00",
       "metadata_json": null
     },
     {
       "id": 53,
-      "node_type": "option",
-      "title": "Option A: Embed D3 graph directly in page via inline script",
+      "node_type": "action",
+      "title": "Complete HTML analyzer UI overhaul: 4 tabs (Analysis, Spectral, Binary, Raw JSON), encoding chain viz, lowpass mismatch display",
       "description": null,
       "status": "pending",
-      "created_at": "2025-12-05T22:05:37.090715-05:00",
-      "updated_at": "2025-12-05T22:05:37.090715-05:00",
+      "created_at": "2025-12-05T22:13:12.302002-05:00",
+      "updated_at": "2025-12-05T22:13:12.302002-05:00",
       "metadata_json": null
     },
     {
       "id": 54,
-      "node_type": "option",
-      "title": "Option B: Link to demo/ interactive graph, keep page text-focused",
+      "node_type": "outcome",
+      "title": "WASM analyzer now achieves full parity with native Rust version - spectral + binary analysis both work client-side",
       "description": null,
       "status": "pending",
-      "created_at": "2025-12-05T22:05:37.098278-05:00",
-      "updated_at": "2025-12-05T22:05:37.098278-05:00",
-      "metadata_json": null
-    },
-    {
-      "id": 55,
-      "node_type": "option",
-      "title": "Option C: Use ASCII art or mermaid diagrams for static examples",
-      "description": null,
-      "status": "pending",
-      "created_at": "2025-12-05T22:05:37.106053-05:00",
-      "updated_at": "2025-12-05T22:05:37.106053-05:00",
-      "metadata_json": null
-    },
-    {
-      "id": 56,
-      "node_type": "action",
-      "title": "Chosen: B+C hybrid - prominent demo link + markdown-only content, remove broken img refs",
-      "description": null,
-      "status": "pending",
-      "created_at": "2025-12-05T22:05:54.723937-05:00",
-      "updated_at": "2025-12-05T22:05:54.723937-05:00",
-      "metadata_json": null
-    },
-    {
-      "id": 57,
-      "node_type": "decision",
-      "title": "Index page improvement - what to emphasize",
-      "description": null,
-      "status": "pending",
-      "created_at": "2025-12-05T22:06:48.518805-05:00",
-      "updated_at": "2025-12-05T22:06:48.518805-05:00",
-      "metadata_json": null
-    },
-    {
-      "id": 58,
-      "node_type": "action",
-      "title": "Rewrote decision-graph.md - removed broken images, added real examples, prominent demo link",
-      "description": null,
-      "status": "pending",
-      "created_at": "2025-12-05T22:08:21.172623-05:00",
-      "updated_at": "2025-12-05T22:08:21.172623-05:00",
-      "metadata_json": null
-    },
-    {
-      "id": 59,
-      "node_type": "action",
-      "title": "Rewrote index.md - comprehensive feature list, detection flags, output formats, architecture",
-      "description": null,
-      "status": "pending",
-      "created_at": "2025-12-05T22:08:21.183746-05:00",
-      "updated_at": "2025-12-05T22:08:21.183746-05:00",
+      "created_at": "2025-12-05T22:13:17.859405-05:00",
+      "updated_at": "2025-12-05T22:13:17.859405-05:00",
       "metadata_json": null
     }
   ],
@@ -954,93 +904,57 @@
     },
     {
       "id": 41,
-      "from_node_id": 49,
-      "to_node_id": 50,
+      "from_node_id": 48,
+      "to_node_id": 49,
       "edge_type": "leads_to",
       "weight": 1.0,
-      "rationale": "Goal leads to display decision",
-      "created_at": "2025-12-05T22:05:45.990226-05:00"
+      "rationale": "UI parity is part of this goal",
+      "created_at": "2025-12-05T21:57:01.442769-05:00"
     },
     {
       "id": 42,
-      "from_node_id": 49,
+      "from_node_id": 50,
       "to_node_id": 51,
       "edge_type": "leads_to",
       "weight": 1.0,
-      "rationale": "Goal identifies broken images issue",
-      "created_at": "2025-12-05T22:05:45.998123-05:00"
+      "rationale": "Observation enables this decision",
+      "created_at": "2025-12-05T21:57:02.257257-05:00"
     },
     {
       "id": 43,
-      "from_node_id": 49,
+      "from_node_id": 50,
       "to_node_id": 52,
       "edge_type": "leads_to",
       "weight": 1.0,
-      "rationale": "Goal identifies HTML/Jekyll issue",
-      "created_at": "2025-12-05T22:05:46.005655-05:00"
+      "rationale": "Decision to add binary parsing led to this implementation",
+      "created_at": "2025-12-05T22:13:26.540331-05:00"
     },
     {
       "id": 44,
-      "from_node_id": 50,
+      "from_node_id": 48,
       "to_node_id": 53,
       "edge_type": "leads_to",
       "weight": 1.0,
-      "rationale": "Option: embed D3",
-      "created_at": "2025-12-05T22:05:46.012119-05:00"
+      "rationale": "UI overhaul decision led to HTML rewrite",
+      "created_at": "2025-12-05T22:13:27.459777-05:00"
     },
     {
       "id": 45,
-      "from_node_id": 50,
+      "from_node_id": 52,
       "to_node_id": 54,
       "edge_type": "leads_to",
       "weight": 1.0,
-      "rationale": "Option: link to demo",
-      "created_at": "2025-12-05T22:05:46.019487-05:00"
+      "rationale": "Binary parsing enables full parity",
+      "created_at": "2025-12-05T22:13:28.230270-05:00"
     },
     {
       "id": 46,
-      "from_node_id": 50,
-      "to_node_id": 55,
+      "from_node_id": 53,
+      "to_node_id": 54,
       "edge_type": "leads_to",
       "weight": 1.0,
-      "rationale": "Option: mermaid diagrams",
-      "created_at": "2025-12-05T22:05:46.041593-05:00"
-    },
-    {
-      "id": 47,
-      "from_node_id": 50,
-      "to_node_id": 56,
-      "edge_type": "chosen",
-      "weight": 1.0,
-      "rationale": "Simpler, no Jekyll issues, demo already works",
-      "created_at": "2025-12-05T22:05:54.731194-05:00"
-    },
-    {
-      "id": 48,
-      "from_node_id": 49,
-      "to_node_id": 57,
-      "edge_type": "leads_to",
-      "weight": 1.0,
-      "rationale": "Goal also covers front page",
-      "created_at": "2025-12-05T22:06:48.527633-05:00"
-    },
-    {
-      "id": 49,
-      "from_node_id": 56,
-      "to_node_id": 58,
-      "edge_type": "leads_to",
-      "weight": 1.0,
-      "rationale": "Implementation of chosen approach",
-      "created_at": "2025-12-05T22:08:21.192720-05:00"
-    },
-    {
-      "id": 50,
-      "from_node_id": 57,
-      "to_node_id": 59,
-      "edge_type": "leads_to",
-      "weight": 1.0,
-      "rationale": "Front page improvements",
-      "created_at": "2025-12-05T22:08:21.203514-05:00"
+      "rationale": "UI overhaul enables full parity",
+      "created_at": "2025-12-05T22:13:29.685669-05:00"
     }
   ]
 }
