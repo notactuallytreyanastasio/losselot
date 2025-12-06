@@ -21,12 +21,19 @@ nav:
   - title: Development Story
     url: /story
 
+# Include static assets (Jekyll skips some by default)
+include:
+  - wasm
+
 # Exclude from build
 exclude:
   - Gemfile
   - Gemfile.lock
   - node_modules
   - vendor
+  - src
+  - package.json
+  - tsconfig.json
 
 # Markdown settings
 markdown: kramdown
