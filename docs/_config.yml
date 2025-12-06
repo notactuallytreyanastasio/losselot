@@ -32,8 +32,11 @@ exclude:
   - node_modules
   - vendor
   - src
+  - dist
   - package.json
+  - package-lock.json
   - tsconfig.json
+  - vitest.config.ts
 
 # Markdown settings
 markdown: kramdown

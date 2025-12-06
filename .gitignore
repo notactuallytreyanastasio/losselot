@@ -19,3 +19,16 @@ s1.png
 s2.png
 sus2.mp3
 docs/demo.mov
+
+# Frontend build artifacts
+docs/node_modules/
+docs/dist/
+
+# Database (tracked separately)
+losselot.db
+
+# Reports
+report.html
+
+# Generated/temp files
+git.log

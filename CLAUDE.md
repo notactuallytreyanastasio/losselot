@@ -33,14 +33,19 @@ Or use: `/context`
 ./target/release/losselot db add-edge FROM_ID TO_ID -r "Why they connect"
 ```
 
-Or use Makefile shortcuts:
+Or use Makefile shortcuts (with optional confidence C=0-100):
 ```bash
-make obs T="Your observation"
-make decision T="Your decision"
-make action T="What you did"
-make outcome T="Result"
+make obs T="Your observation" C=85        # Add with 85% confidence
+make decision T="Your decision" C=70
+make action T="What you did" C=95
+make outcome T="Result" C=90
 make link FROM=1 TO=2 REASON="why"
 ```
+
+Confidence levels:
+- **70-100** (High) - Well understood, proven approach
+- **40-69** (Medium) - Reasonable choice, some uncertainty
+- **0-39** (Low) - Experimental, might revisit
 
 ### Before Deploying - SYNC THE GRAPH:
 ```bash
@@ -149,8 +154,9 @@ const FFT_SIZE: usize = 8192;  // ~186ms windows at 44.1kHz
 
 ## Testing
 
+### Rust Tests
 ```bash
-# Run all tests
+# Run all Rust tests
 cargo test
 
 # Run tests with output
@@ -161,6 +167,20 @@ cargo test test_threshold_boundaries
 ```
 
 Test files can be generated with `./examples/generate_test_files.sh` which creates various encoding scenarios (clean, transcoded, re-encoded chains).
+
+### TypeScript/Frontend Tests
+```bash
+# From docs/ directory
+npm run test        # Run all frontend tests
+npm run typecheck   # Check TypeScript types (no emit)
+npm run build       # Compile TypeScript to dist/
+```
+
+Frontend types are in `docs/src/types/` and mirror the Rust backend structs:
+- `graph.ts` - DecisionNode, DecisionEdge, GraphData (mirrors `src/db.rs`)
+- `analysis.ts` - AnalysisResult, BinaryAnalysis, SpectralAnalysis (mirrors WASM output)
+
+**IMPORTANT: Both Rust and TypeScript tests run in CI. All tests must pass before merge.**
 
 ## Common Workflows
 
