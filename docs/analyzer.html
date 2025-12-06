@@ -508,9 +508,14 @@
             } else if (bin.frame_count === 0) lowpassAnalysis.textContent = 'Not MP3 - binary analysis N/A.';
             else lowpassAnalysis.textContent = 'Insufficient data.';
 
-            // Charts
-            if (r.spectrogramData?.length) drawSpectrogram(r.spectrogramData, r.spectrogramTimes, r.spectrogramFreqs);
-            if (r.frequencyResponse?.length) { drawSpectrum(r.frequencyResponse); drawHFDetail(r.frequencyResponse); }
+            // Make visible BEFORE drawing charts (so canvas has dimensions)
+            result.classList.add('visible');
+
+            // Charts (need visible parent for canvas dimensions)
+            requestAnimationFrame(() => {
+                if (r.spectrogramData?.length) drawSpectrogram(r.spectrogramData, r.spectrogramTimes, r.spectrogramFreqs);
+                if (r.frequencyResponse?.length) { drawSpectrum(r.frequencyResponse); drawHFDetail(r.frequencyResponse); }
+            });
             if (r.bandEnergy) {
                 document.getElementById('rms-full').textContent = formatDb(r.bandEnergy.rms_full);
                 document.getElementById('rms-mid-high').textContent = formatDb(r.bandEnergy.rms_mid_high);
@@ -527,7 +532,6 @@
             document.getElementById('raw-flags').textContent = r.flags.length ? r.flags.join('\n') : '(none)';
             const jsonDisplay = {...r}; delete jsonDisplay.spectrogramData; delete jsonDisplay.spectrogramTimes; delete jsonDisplay.spectrogramFreqs; delete jsonDisplay.frequencyResponse;
             document.getElementById('raw-json').textContent = JSON.stringify(jsonDisplay, null, 2);
-            result.classList.add('visible');
         }
 
         function buildEncodingChain(r, bin) {
