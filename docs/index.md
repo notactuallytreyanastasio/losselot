@@ -4,142 +4,227 @@ title: Home
 ---
 
 <style>
-.hero-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 40px;
-  margin-bottom: 30px;
+.hero {
+  text-align: center;
+  padding: 40px 20px 60px;
 }
-@media (max-width: 768px) {
-  .hero-grid { grid-template-columns: 1fr; }
-}
-.hero-left h1 { margin-top: 0; }
-.hero-left img { max-width: 100%; border-radius: 8px; margin: 15px 0; }
-.btn-primary {
-  display: inline-block;
-  background: #3b82f6;
-  color: white !important;
-  padding: 12px 24px;
-  border-radius: 6px;
-  text-decoration: none;
-  font-weight: 600;
-  margin-right: 10px;
+.hero h1 {
+  font-size: 3rem;
   margin-bottom: 10px;
 }
-.btn-secondary {
+.hero .tagline {
+  font-size: 1.25rem;
+  color: #888;
+  margin-bottom: 40px;
+}
+.hero-gif {
+  width: 100%;
+  max-width: 1000px;
+  border-radius: 12px;
+  margin: 0 auto 40px;
+  display: block;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.hero-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+.btn {
   display: inline-block;
-  background: #1e293b;
-  color: #60a5fa !important;
-  padding: 12px 24px;
-  border-radius: 6px;
+  padding: 14px 28px;
+  border-radius: 8px;
   text-decoration: none;
   font-weight: 600;
-  border: 1px solid #3b82f6;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: #3b82f6;
+  color: white !important;
 }
 .btn-primary:hover { background: #2563eb; }
-.btn-secondary:hover { background: #334155; }
-.verdict-table { width: 100%; margin: 15px 0; }
-.verdict-table th, .verdict-table td { padding: 8px 12px; text-align: left; }
-.verdict-table th { border-bottom: 2px solid #334155; }
-.verdict-table td { border-bottom: 1px solid #1e293b; }
-.code-block {
-  background: #0d1117;
-  padding: 15px;
-  border-radius: 6px;
-  overflow-x: auto;
-  font-family: monospace;
-  font-size: 13px;
-  margin: 15px 0;
+.btn-outline {
+  border: 2px solid #444;
+  color: #ccc !important;
 }
-.cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 15px;
+.btn-outline:hover { border-color: #3b82f6; color: #3b82f6 !important; }
+
+.section {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 60px 20px;
+}
+.section h2 {
+  font-size: 1.75rem;
+  margin-bottom: 30px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #333;
+}
+
+.nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.nav-item {
+  margin-bottom: 25px;
+}
+.nav-item a {
+  display: block;
+  padding: 20px 25px;
+  border: 1px solid #333;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.nav-item a:hover {
+  border-color: #3b82f6;
+  transform: translateX(5px);
+}
+.nav-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 6px;
+}
+.nav-desc {
+  font-size: 0.95rem;
+  color: #888;
+  line-height: 1.5;
+}
+
+.how-it-works {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 40px 20px 60px;
+}
+.how-it-works h2 {
+  font-size: 1.75rem;
+  margin-bottom: 20px;
+}
+.how-it-works p {
+  color: #aaa;
+  margin-bottom: 20px;
+  line-height: 1.7;
+}
+.verdict-table {
+  width: 100%;
   margin: 20px 0;
+  border-collapse: collapse;
 }
-@media (max-width: 768px) {
-  .cards { grid-template-columns: 1fr; }
+.verdict-table th, .verdict-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #333;
 }
-.card {
-  background: #16213e;
+.verdict-table th {
+  color: #888;
+  font-weight: 500;
+}
+.code-block {
+  background: #111;
   padding: 20px;
   border-radius: 8px;
-  border: 1px solid #0f3460;
+  font-family: monospace;
+  font-size: 14px;
+  overflow-x: auto;
+  margin: 25px 0;
+}
+
+footer.site-footer {
+  text-align: center;
+  padding: 40px 20px;
+  border-top: 1px solid #333;
+  margin-top: 40px;
+}
+footer a {
+  color: #60a5fa;
   text-decoration: none;
 }
-.card:hover { border-color: #3b82f6; }
-.card-title { font-weight: 600; margin-bottom: 5px; }
-.card-desc { color: #999; font-size: 14px; }
+footer a:hover { text-decoration: underline; }
 </style>
 
-<div class="hero-grid">
-<div class="hero-left">
+<div class="hero">
+  <h1>Losselot</h1>
+  <p class="tagline">Audio forensics meets AI-assisted development</p>
 
-<h1>Losselot</h1>
+  <img src="demo.gif" alt="Losselot Demo" class="hero-gif">
 
-<p><strong>Audio forensics meets AI-assisted development.</strong></p>
-
-<p>Detect fake lossless files. Every decision tracked in a queryable graph.</p>
-
-<img src="demo.gif" alt="Losselot Demo">
-
-<p>
-<a href="analyzer.html" class="btn-primary">Try in Browser</a>
-<a href="demo/" class="btn-secondary">View Decision Graph</a>
-</p>
-
+  <div class="hero-buttons">
+    <a href="analyzer.html" class="btn btn-primary">Try in Browser</a>
+    <a href="https://github.com/notactuallytreyanastasio/losselot" class="btn btn-outline">View on GitHub</a>
+  </div>
 </div>
-<div class="hero-right">
 
-<h2>How It Works</h2>
+<div class="section">
+  <h2>Explore</h2>
 
-<p>When someone converts MP3 to FLAC, the removed frequencies don't come back:</p>
+  <ul class="nav-list">
+    <li class="nav-item">
+      <a href="analyzer.html">
+        <div class="nav-title">Browser Analyzer</div>
+        <div class="nav-desc">Drop an audio file and get instant analysis. Runs entirely in your browser via WebAssembly.</div>
+      </a>
+    </li>
 
-<ul>
-<li><strong>Spectral</strong> - FFT detects frequency cutoffs</li>
-<li><strong>Binary</strong> - Finds encoder signatures (LAME, FFmpeg)</li>
-<li><strong>Combined</strong> - Agreement increases confidence</li>
-</ul>
+    <li class="nav-item">
+      <a href="demo/">
+        <div class="nav-title">Decision Graph</div>
+        <div class="nav-desc">Interactive visualization of every development decision. See how the project evolved through 87+ tracked nodes.</div>
+      </a>
+    </li>
 
-<table class="verdict-table">
-<tr><th>Score</th><th>Verdict</th><th>Meaning</th></tr>
-<tr><td>0-34</td><td>OK</td><td>Clean</td></tr>
-<tr><td>35-64</td><td>SUSPECT</td><td>Possibly transcoded</td></tr>
-<tr><td>65+</td><td>TRANSCODE</td><td>Definitely lossy origin</td></tr>
-</table>
+    <li class="nav-item">
+      <a href="spelunk-timeline.html">
+        <div class="nav-title">Timeline View</div>
+        <div class="nav-desc">Chronological walkthrough merging git commits with decision nodes. Filter by type, search, and trace history.</div>
+      </a>
+    </li>
 
-<h2>Quick Start</h2>
+    <li class="nav-item">
+      <a href="spelunk-graph.html">
+        <div class="nav-title">Graph Explorer</div>
+        <div class="nav-desc">Force-directed graph visualization. Zoom, pan, and trace paths between connected decisions.</div>
+      </a>
+    </li>
 
-<div class="code-block">
+    <li class="nav-item">
+      <a href="spelunk-story.html">
+        <div class="nav-title">The Story</div>
+        <div class="nav-desc">Narrative walkthrough of how this project came to be. Chapters covering detection algorithms, the memory problem, and more.</div>
+      </a>
+    </li>
+  </ul>
+</div>
+
+<div class="how-it-works">
+  <h2>How It Works</h2>
+
+  <p>When someone converts MP3 to FLAC, the removed frequencies don't come back. Losselot detects these scars using dual analysis:</p>
+
+  <p><strong>Spectral Analysis</strong> uses FFT to detect frequency cutoffs. Lossy codecs remove high frequencies - 128kbps MP3 cuts at ~16kHz, 320kbps at ~20kHz.</p>
+
+  <p><strong>Binary Analysis</strong> finds encoder signatures embedded in files. LAME headers, FFmpeg markers, re-encoding chains.</p>
+
+  <table class="verdict-table">
+    <tr><th>Score</th><th>Verdict</th><th>Meaning</th></tr>
+    <tr><td>0-34</td><td>OK</td><td>Likely genuine lossless</td></tr>
+    <tr><td>35-64</td><td>SUSPECT</td><td>Possibly transcoded</td></tr>
+    <tr><td>65+</td><td>TRANSCODE</td><td>Definitely lossy origin</td></tr>
+  </table>
+
+  <h2>Quick Start</h2>
+
+  <div class="code-block">
 git clone https://github.com/notactuallytreyanastasio/losselot<br>
 cd losselot && cargo build --release<br>
-./target/release/losselot serve ~/Music/
+./target/release/losselot analyze ~/Music/album.flac<br>
+./target/release/losselot serve ~/Music/  # Web UI
+  </div>
 </div>
 
-</div>
-</div>
-
-<hr>
-
-<h2>The Living Museum</h2>
-
-<p>This project tracks every decision in a queryable graph. When context is lost, the reasoning survives.</p>
-
-<div class="cards">
-<a href="decision-graph" class="card">
-<div class="card-title" style="color: #4ade80;">Decision Graph</div>
-<div class="card-desc">77+ nodes of dev decisions</div>
-</a>
-<a href="claude-tooling" class="card">
-<div class="card-title" style="color: #60a5fa;">Claude Tooling</div>
-<div class="card-desc">AI development workflow</div>
-</a>
-<a href="story" class="card">
-<div class="card-title" style="color: #a855f7;">The Story</div>
-<div class="card-desc">How this evolved</div>
-</a>
-</div>
-
-<p style="text-align: center; margin-top: 30px;">
-<a href="https://github.com/notactuallytreyanastasio/losselot">View on GitHub</a>
-</p>
+<footer class="site-footer">
+  <a href="https://github.com/notactuallytreyanastasio/losselot">GitHub</a>
+</footer>
